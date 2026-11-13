@@ -1,0 +1,9 @@
+node_modules/
+# API keys: never commit
+.env
+# transient / large files
+data/cache.json
+data/*.tmp
+data/*.corrupt-*
+*.log
+.DS_Store

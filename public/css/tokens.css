@@ -1,0 +1,66 @@
+/* Design tokens. Light is default; dark via prefers-color-scheme or [data-theme]. */
+:root {
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Condensed "scoreboard" face for numbers and headings — system fonts only, works offline. */
+  --font-display: "Bahnschrift", "DIN Alternate", "DIN Condensed", "Barlow Condensed", "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+
+  --bg: #eef2f5;
+  --surface: #ffffff;
+  --surface-2: #f6f8fa;
+  --ink: #13202b;
+  --muted: #55636f;
+  --line: #d5dde4;
+  --line-strong: #b9c5cf;
+  --focus: #1d5fd1;
+
+  --amber: #8f5a00;          /* odds / numbers accent (AA on light) */
+  --amber-bg: #fff4dc;
+  --pos: #0b6e53;            /* positive edge / won */
+  --pos-bg: #e2f4ee;
+  --neg: #b42318;            /* negative edge / lost */
+  --neg-bg: #fdecea;
+  --info: #1f5aa6;
+  --info-bg: #e6eefb;
+  --mock: #6b4fa0;
+  --mock-bg: #efeaf8;
+
+  --easy: #0b6e66;           /* Könnyű mix */
+  --easy-bg: #e3f3f1;
+  --brutal: #b0174f;         /* Brutális mix */
+  --brutal-ink: #ffffff;
+  --brutal-bg: #1d0f16;
+
+  --home: #2c5d8f;
+  --draw: #8a96a1;
+  --away: #b5683a;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+  --shadow: 0 1px 2px rgba(19, 32, 43, .06), 0 4px 14px rgba(19, 32, 43, .05);
+  --space: 16px;
+  --sidebar: 232px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d141b; --surface: #151f29; --surface-2: #1a2632; --ink: #e5ecf2; --muted: #9aa8b4; --line: #26333f; --line-strong: #364553; --focus: #7fb0ff;
+    --amber: #f5b335; --amber-bg: #2d2412; --pos: #4fd1a5; --pos-bg: #10291f; --neg: #ff8a7a; --neg-bg: #33181a;
+    --info: #8db8ff; --info-bg: #15243a; --mock: #c3a8f2; --mock-bg: #261e36;
+    --easy: #4fd1c0; --easy-bg: #0f2a28; --brutal: #ff3d7f; --brutal-bg: #1d0f16;
+    --home: #6fa3d8; --draw: #6d7a86; --away: #e09464;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d141b; --surface: #151f29; --surface-2: #1a2632; --ink: #e5ecf2; --muted: #9aa8b4; --line: #26333f; --line-strong: #364553; --focus: #7fb0ff;
+  --amber: #f5b335; --amber-bg: #2d2412; --pos: #4fd1a5; --pos-bg: #10291f; --neg: #ff8a7a; --neg-bg: #33181a;
+  --info: #8db8ff; --info-bg: #15243a; --mock: #c3a8f2; --mock-bg: #261e36;
+  --easy: #4fd1c0; --easy-bg: #0f2a28; --brutal: #ff3d7f; --brutal-bg: #1d0f16;
+  --home: #6fa3d8; --draw: #6d7a86; --away: #e09464;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.25);
+  color-scheme: dark;
+}

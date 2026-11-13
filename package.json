@@ -1,0 +1,20 @@
+{
+  "name": "sportelemzo",
+  "version": "1.0.0",
+  "description": "Helyben futó sportelemző és szelvényépítő alkalmazás (NBA, NHL, tenisz, labdarúgás) – magyar felülettel.",
+  "type": "module",
+  "main": "server/index.js",
+  "private": true,
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "mock": "node server/index.js --mock",
+    "dev": "node --watch server/index.js",
+    "test": "node --test",
+    "backtest": "node scripts/backtest.js",
+    "verify": "node scripts/verify.js"
+  },
+  "license": "MIT"
+}
