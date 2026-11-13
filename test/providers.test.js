@@ -84,3 +84,27 @@ test('ESPN soccer: goalscorers and yellow cards from a finished match; NBA leade
   assert.equal(pre.stats.home.players[0].name, 'Nikola Jokic');
   assert.ok(analyzeMatch(pre).markets.some((mk) => mk.key.startsWith('pl:home:') && mk.line === 26.5));
 });
+
+test('cup ties after extra time settle on the 90-minute score', async () => {
+  const { settleSelection } = await import('../server/engine/settle.js');
+  const ev = { id: '88', date: '2026-11-04T20:00Z', competitions: [{ date: '2026-11-04T20:00Z', status: { type: { state: 'post', name: 'STATUS_FINAL_AET', detail: 'AET' } },
+    competitors: [
+      { homeAway: 'home', score: '2', team: { id: '1', displayName: 'Real Madrid' }, linescores: [{ value: 0 }, { value: 1 }, { value: 1 }, { value: 0 }] },
+      { homeAway: 'away', score: '1', team: { id: '2', displayName: 'Getafe' }, linescores: [{ value: 1 }, { value: 0 }, { value: 0 }, { value: 0 }] }] }] };
+  const m = normaliseTeamEvent(ev, leagueById('copadelrey'), Date.now());
+  assert.equal(m.extraTime, true); assert.deepEqual(m.regScore, { home: 1, away: 1 });
+  assert.equal(settleSelection(m, '1x2', 'draw'), 'won', '1-1 after 90 minutes');
+  assert.equal(settleSelection(m, '1x2', 'home'), 'lost');
+  assert.equal(settleSelection(m, 'ou25', 'under', 2.5), 'won');
+  assert.equal(settleSelection(m, 'scorer', 'home:x'), 'void');
+  assert.equal(settleSelection({ ...m, regScore: undefined }, '1x2', 'home'), 'void', 'unknown 90-minute score → void');
+});
+
+test('Nations League and cups are configured; API-Football AET uses the full-time score', async () => {
+  const { normaliseFixture } = await import('../server/providers/apisports.js');
+  for (const id of ['unl', 'facup', 'eflcup', 'copadelrey', 'coppaitalia', 'dfbpokal', 'cdf', 'libertadores', 'mkupa']) assert.ok(leagueById(id)?.cup, id);
+  assert.equal(leagueById('unl').espn, 'soccer/uefa.nations');
+  const it = { fixture: { id: 1, date: '2026-11-04T18:00:00+00:00', status: { short: 'PEN' } }, teams: { home: { name: 'Ferencváros' }, away: { name: 'Vasas' } }, goals: { home: 1, away: 1 }, score: { fulltime: { home: 1, away: 1 } } };
+  const m = normaliseFixture(it, leagueById('mkupa'), Date.now(), 'live');
+  assert.equal(m.extraTime, true); assert.deepEqual(m.regScore, { home: 1, away: 1 }); assert.equal(m.statusText, 'Vége (11-esek)');
+});

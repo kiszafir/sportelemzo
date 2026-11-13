@@ -1,6 +1,7 @@
 node_modules/
-# API keys: never commit
+# API keys and the phone PIN: never commit
 .env
+data/local-secrets.json
 # transient / large files
 data/cache.json
 data/*.tmp

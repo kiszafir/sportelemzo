@@ -2,6 +2,7 @@
 // enrich with standings / injuries / odds / weather, analyse every match,
 // log and settle tips, then notify SSE listeners.
 import { config, LEAGUES } from '../config.js';
+import { providerHealth } from '../lib/http.js';
 import { createLogger } from '../logger.js';
 import { db, store } from '../store.js';
 import { providers } from '../providers/registry.js';
@@ -77,6 +78,21 @@ const findTeam = (map, name) => {
   return best;
 };
 
+const DOMESTIC_KEYS = ['winPct', 'homeWinPct', 'awayWinPct', 'form', 'gfPg', 'gaPg', 'ppg', 'xgPg', 'xgaPg', 'possession', 'gamesPlayed', 'players', 'yellowPg'];
+function domesticStats(name, cupLeague) {
+  for (const m of state.matches.values()) {
+    const L = LEAGUES.find((x) => x.id === m.league);
+    if (!L || L.cup || L.sport !== cupLeague.sport || m.provider === 'mock') continue;
+    for (const side of ['home', 'away']) {
+      if (nameSimilarity(m[side].name, name) < 0.85) continue;
+      const st = m.stats?.[side] || {};
+      const out = Object.fromEntries(DOMESTIC_KEYS.filter((k) => st[k] != null).map((k) => [k, st[k]]));
+      if (Object.keys(out).length >= 3) return { ...out, domesticLeague: L.name };
+    }
+  }
+  return null;
+}
+
 const findTeamList = (map, name) => {
   if (map[name]) return map[name];
   let best = null; let bestS = 0.66;
@@ -104,12 +120,15 @@ async function enrichLive(league, matches, allMatches) {
   }
   // Quota protection: injuries and odds only for leagues with an upcoming match soon.
   const startsWithin = (h) => matches.some((m) => m.status === 'pre' && Date.parse(m.startTime) - Date.now() < h * 3600e3);
+  // API-Football has 100 requests/day: injuries and top scorers are "nice to have",
+  // so they stop when fewer than 30 requests are left (NB I / Magyar Kupa fixtures first).
+  const spare = () => providerHealth('apisports').quotaLeft > 30;
   let inj = null;
-  try { if (league.sport === 'football' && P.apisports.enabled() && startsWithin(72)) inj = await P.apisports.injuries(league); } catch { inj = null; }
+  try { if (league.sport === 'football' && P.apisports.enabled() && spare() && startsWithin(72)) inj = await P.apisports.injuries(league); } catch { inj = null; }
   let odds = null;
   try { if (P.oddsapi.enabled() && (startsWithin(36) || matches.some((m) => m.status === 'live'))) odds = await P.oddsapi.odds(league); } catch { odds = null; }
   let scorers = null;
-  try { if (league.sport === 'football' && P.apisports.enabled() && (startsWithin(36) || matches.some((m) => m.status === 'live'))) scorers = await P.apisports.topScorers(league); } catch { scorers = null; }
+  try { if (league.sport === 'football' && P.apisports.enabled() && spare() && (startsWithin(36) || matches.some((m) => m.status === 'live'))) scorers = await P.apisports.topScorers(league); } catch { scorers = null; }
   const cards = league.sport === 'football' ? cardHistory() : null;
 
   // Back-to-back detection from the fetched window (team played the previous day).
@@ -139,6 +158,14 @@ async function enrichLive(league, matches, allMatches) {
     if (inj?.teams) {
       for (const side of ['home', 'away']) m.stats[side].injuries = findTeam(inj.teams, m[side].name) || [];
       m.meta.injuries = metaOf(inj, 'API-Sports');
+    }
+    // Cup ties: the cup's own record is tiny, so borrow the team's domestic-league
+    // season stats (and goalscorers) when that league is loaded too.
+    if (league.cup && !league.national) {
+      for (const side of ['home', 'away']) {
+        const dom = domesticStats(m[side].name, league);
+        if (dom) { m.stats[side] = { ...m.stats[side], ...dom, injuries: m.stats[side].injuries ?? dom.injuries }; m.meta.stats = { status: m.dataStatus, fetchedAt: m.fetchedAt, src: 'hazai bajnoki adatok' }; m.meta.advanced = m.meta.stats; }
+      }
     }
     // Goalscorer data: share of the team's goals × share of minutes played.
     if (scorers?.teams) {
@@ -336,10 +363,13 @@ function blendP(s) {
 }
 
 /** Candidate legs for the bet builders, from the latest analyses. */
-export function legCandidates() {
+export function legCandidates({ allowMock = false } = {}) {
   const out = [];
   for (const [id, a] of state.analyses) {
     const m = state.matches.get(id); if (!m || m.status === 'post') continue;
+    // Tickets are built from REAL matches only. Simulated (MINTA) matches are
+    // allowed solely in the explicit demo mode (DATA_MODE=mock / npm run mock).
+    if (m.provider === 'mock' && !allowMock) continue;
     for (const mk of a.markets) {
       for (const s of mk.selections) {
         if (s.p >= 0.985 || s.odds < 1.05) continue; // nothing left to bet on

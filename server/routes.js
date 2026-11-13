@@ -84,16 +84,21 @@ export function registerRoutes(app) {
     const seed = Math.max(1, Number(req.query.seed) || 1);
     const locked = String(req.query.locked || '').split(',').filter(Boolean);
     const groups = String(req.query.markets || '').split(',').filter((g) => MARKET_GROUPS[g]);
-    const legs = filterByGroups(legCandidates(), groups);
+    const allowMock = config.dataMode === 'mock';
+    const legs = filterByGroups(legCandidates({ allowMock }), groups);
     const days = dayOptions(mode, legs);
     const day = days.some((d) => d.day === req.query.day) ? req.query.day : pickDay(mode, legs);
     const out = buildTickets(mode, legs, { seed, locked, day });
+    const mockLeagues = Object.entries(state.leagueStatus).filter(([, v]) => v.source === 'mock').length;
+    if (!allowMock && mockLeagues) out.warnings.push(`${mockLeagues} bajnokság most csak mintaadatot mutat (nem érhető el az élő forrás) – ezek meccsei nem kerülnek szelvényre.`);
+    if (!allowMock && !legs.length) out.warnings = out.warnings.filter((w) => !w.startsWith('Nincs elég megfelelő tétel'));
+    if (!allowMock && !legs.length) out.warnings.push('Jelenleg nincs valós (élő forrásból származó) közelgő meccs, ezért nem készül szelvény. Mintameccsekből a szelvényépítő nem dolgozik.');
     // with a market filter, fewer sports are expected (e.g. yellow cards = football only)
     if (groups.length) out.warnings = out.warnings.filter((w) => !w.startsWith('Ezen a napon'));
     if (groups.length && !out.tickets.length) out.warnings.push(mode === 'easy'
       ? 'A kiválasztott piactípusokon ezen a napon nincs elég nagy valószínűségű tétel a Könnyű mixhez (pl. a gólszerző tételek általában 50% alattiak). Vegyél hozzá más piacot, vagy próbáld a Brutális mixet.'
       : 'A kiválasztott piactípusokból ezen a napon nem áll össze 70,00 feletti szelvény. Vegyél hozzá más piacot vagy válassz másik napot.');
-    res.json({ ...out, days, today: localDay(), seed, lastUpdate: state.lastUpdate, markets: groups, marketGroups: Object.entries(MARKET_GROUPS).map(([id, g]) => ({ id, label: g.label })) });
+    res.json({ ...out, days, today: localDay(), seed, lastUpdate: state.lastUpdate, realOnly: !allowMock, markets: groups, marketGroups: Object.entries(MARKET_GROUPS).map(([id, g]) => ({ id, label: g.label })) });
   });
 
   app.get('/api/tips', (req, res) => {

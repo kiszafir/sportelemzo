@@ -42,6 +42,13 @@ export function settleSelection(match, marketKey, selKey, line) {
     }
   }
   if (!Number.isFinite(hs) || !Number.isFinite(as)) return null;
+  // Football cup ties after extra time: every market is a 90-minute market. Use the
+  // regular-time score when known; otherwise (and for scorers/cards, which cannot
+  // be split by period here) the bet is void rather than guessed.
+  if (match.sport === 'football' && match.extraTime) {
+    if (!match.regScore || marketKey === 'scorer' || marketKey.startsWith('yc')) return 'void';
+    return settleSelection({ ...match, extraTime: false, home: { ...match.home, score: match.regScore.home }, away: { ...match.away, score: match.regScore.away } }, marketKey, selKey, line);
+  }
   const total = hs + as;
   switch (marketKey) {
     case 'ml': return ok(selKey === 'home' ? hs > as : as > hs);

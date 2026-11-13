@@ -3,7 +3,7 @@
 // Builders read the distributions the main models left in `ctx`.
 import { normCdf, clamp } from './mathutil.js';
 
-export const YELLOW_BASE = { epl: 1.9, laliga: 2.5, seriea: 2.3, bundesliga: 2.0, ligue1: 1.9, ucl: 1.8, uel: 1.9, uecl: 2.0, eredivisie: 1.7, primeira: 2.4, championship: 2.0, superlig: 2.4, belgium: 2.0, scotland: 1.8, mls: 2.0, nbi: 2.3 };
+export const YELLOW_BASE = { epl: 1.9, laliga: 2.5, seriea: 2.3, bundesliga: 2.0, ligue1: 1.9, ucl: 1.8, uel: 1.9, uecl: 2.0, eredivisie: 1.7, primeira: 2.4, championship: 2.0, superlig: 2.4, belgium: 2.0, scotland: 1.8, mls: 2.0, nbi: 2.3, unl: 1.9, facup: 1.8, eflcup: 1.8, copadelrey: 2.4, coppaitalia: 2.2, dfbpokal: 2.0, cdf: 1.9, libertadores: 2.6, mkupa: 2.2 };
 
 const fmt = (x) => String(x).replace('.', ',');
 const half = (x) => Math.floor(x) + 0.5;

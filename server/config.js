@@ -19,6 +19,7 @@ function loadDotEnv() {
     const key = line.slice(0, eq).trim();
     let val = line.slice(eq + 1).trim();
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) val = val.slice(1, -1);
+    else val = val.replace(/\s+#.*$/, ''); // inline comment after an unquoted value
     if (process.env[key] === undefined) process.env[key] = val;
   }
 }
@@ -38,7 +39,9 @@ if (argv.includes('--mock') || bool(env.MOCK_MODE, false)) dataMode = 'mock';
 
 export const config = {
   port: num(env.PORT, 3000),
-  host: env.HOST || '127.0.0.1',
+  // --lan (npm run telefon): listen on the Wi-Fi too, protected by a PIN
+  lan: argv.includes('--lan') || bool(env.LAN, false),
+  host: env.HOST || (argv.includes('--lan') || bool(env.LAN, false) ? '0.0.0.0' : '127.0.0.1'),
   dataMode,
   dataDir: path.resolve(ROOT, env.DATA_DIR || 'data'),
   timezone: env.TZ_DISPLAY || 'Europe/Budapest',
@@ -95,6 +98,17 @@ export const LEAGUES = [
   { id: 'belgium', sport: 'football', name: 'Jupiler Pro League', short: 'BEL', espn: 'soccer/bel.1', odds: 'soccer_belgium_first_div', as: 144 },
   { id: 'scotland', sport: 'football', name: 'Skót Premiership', short: 'SCO', espn: 'soccer/sco.1', odds: 'soccer_spl', as: 179 },
   { id: 'mls', sport: 'football', name: 'MLS', short: 'MLS', espn: 'soccer/usa.1', odds: 'soccer_usa_mls', as: 253 },
+  // National-team and cup competitions (cup: true → knockout rules, extra-time aware settlement)
+  { id: 'unl', sport: 'football', name: 'Nemzetek Ligája', short: 'NL', espn: 'soccer/uefa.nations', odds: 'soccer_uefa_nations_league', as: 5, cup: true, national: true },
+  { id: 'facup', sport: 'football', name: 'FA-kupa', short: 'FA', espn: 'soccer/eng.fa', odds: 'soccer_fa_cup', as: 45, cup: true },
+  { id: 'eflcup', sport: 'football', name: 'Angol Ligakupa', short: 'EFL', espn: 'soccer/eng.league_cup', odds: 'soccer_england_efl_cup', as: 48, cup: true },
+  { id: 'copadelrey', sport: 'football', name: 'Copa del Rey', short: 'CdR', espn: 'soccer/esp.copa_del_rey', odds: 'soccer_spain_copa_del_rey', as: 143, cup: true },
+  { id: 'coppaitalia', sport: 'football', name: 'Olasz Kupa', short: 'CI', espn: 'soccer/ita.coppa_italia', odds: 'soccer_italy_coppa_italia', as: 137, cup: true },
+  { id: 'dfbpokal', sport: 'football', name: 'Német Kupa (DFB-Pokal)', short: 'DFB', espn: 'soccer/ger.dfb_pokal', odds: 'soccer_germany_dfb_pokal', as: 81, cup: true },
+  { id: 'cdf', sport: 'football', name: 'Francia Kupa', short: 'CdF', espn: 'soccer/fra.coupe_de_france', odds: 'soccer_france_coupe_de_france', as: 66, cup: true },
+  { id: 'libertadores', sport: 'football', name: 'Copa Libertadores', short: 'LIB', espn: 'soccer/conmebol.libertadores', odds: 'soccer_conmebol_copa_libertadores', as: 13, cup: true },
+  // Magyar Kupa: not on ESPN; API-Football league id looked up by name (API_SPORTS_KEY).
+  { id: 'mkupa', sport: 'football', name: 'Magyar Kupa', short: 'MK', espn: null, odds: null, asLookup: { country: 'Hungary', name: 'Magyar Kupa' }, cup: true },
   // ESPN does not cover NB I: fixtures come from API-Football (API_SPORTS_KEY), otherwise mock data.
   { id: 'nbi', sport: 'football', name: 'NB I', short: 'NB I', espn: null, odds: null, as: 271 },
   // Handball: ESPN has none. API-Handball (same API_SPORTS_KEY, separate daily quota);

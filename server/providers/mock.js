@@ -38,6 +38,15 @@ const GRID = {
   hbnbi: { every: 480, offset: 330, dur: 95 },
   hbnbiw: { every: 600, offset: 420, dur: 95 },
   hbl: { every: 480, offset: 30, dur: 95 },
+  unl: { every: 720, offset: 140, dur: 110 },
+  facup: { every: 1440, offset: 300, dur: 110 },
+  eflcup: { every: 1440, offset: 1020, dur: 110 },
+  copadelrey: { every: 1440, offset: 560, dur: 110 },
+  coppaitalia: { every: 1440, offset: 820, dur: 110 },
+  dfbpokal: { every: 1440, offset: 1180, dur: 110 },
+  cdf: { every: 1440, offset: 440, dur: 110 },
+  libertadores: { every: 1440, offset: 1380, dur: 110 },
+  mkupa: { every: 1440, offset: 660, dur: 110 },
 };
 
 // ---------------------------------------------------------------------------
@@ -127,9 +136,10 @@ function footballContext(league, home, away) {
   const pos = (n) => ranked.indexOf(n) + 1;
   const size = names.length;
   const mot = (p) => (p <= 3 ? [0.6, 'bajnoki címért harcol'] : p > size - 3 ? [0.5, 'kiesés ellen küzd'] : p <= 6 ? [0.35, 'európai helyért hajt'] : [0, 'középmezőny']);
-  const isCup = ['ucl', 'uel', 'uecl', 'ehfcl', 'ehfclw'].includes(league);
-  const [mh, lh] = isCup ? [0.4, 'csoportkör / ligaszakasz'] : mot(pos(home));
-  const [ma, la] = isCup ? [0.4, 'csoportkör / ligaszakasz'] : mot(pos(away));
+  const isCup = !!leagueById(league)?.cup || ['ucl', 'uel', 'uecl', 'ehfcl', 'ehfclw'].includes(league);
+  const cupLabel = leagueById(league)?.cup ? (leagueById(league)?.national ? 'válogatott, csoportmeccs' : 'kupameccs (kieséses)') : 'csoportkör / ligaszakasz';
+  const [mh, lh] = isCup ? [0.45, cupLabel] : mot(pos(home));
+  const [ma, la] = isCup ? [0.45, cupLabel] : mot(pos(away));
   return { home: { position: isCup ? null : pos(home), leagueSize: size, motivation: mh, motivationLabel: lh }, away: { position: isCup ? null : pos(away), leagueSize: size, motivation: ma, motivationLabel: la } };
 }
 

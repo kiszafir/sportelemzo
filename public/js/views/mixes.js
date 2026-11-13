@@ -59,7 +59,7 @@ export async function render(el, { mode }, { toast }) {
     const filt = groups.length ? `<div class="toolbar"><span class="small ${brutal ? 'muted' : 'muted'}">Piacok:</span><div class="chips" role="group" aria-label="Piactípusok a szelvényen">
       <button class="chip" type="button" data-mk="all" aria-pressed="${!st.markets.length}">Mind</button>
       ${groups.map((g) => `<button class="chip" type="button" data-mk="${g.id}" aria-pressed="${st.markets.includes(g.id)}">${esc(g.label)}</button>`).join('')}</div></div>` : '';
-    const info = `<p class="small muted">${d.candidates} jelölt tétel · ${d.sportsAvailable.map((s) => SPORT_HU[s]).join(', ') || '–'} · állapot: ${d.lastUpdate ? timeS(d.lastUpdate) : '–'} · változat #${st.seed}</p>`;
+    const info = `<p class="small muted">${d.realOnly ? '<strong>Csak valós meccsek</strong> · ' : '<strong>Demó mód: mintameccsekből</strong> · '}${d.candidates} jelölt tétel · ${d.sportsAvailable.map((s) => SPORT_HU[s]).join(', ') || '–'} · állapot: ${d.lastUpdate ? timeS(d.lastUpdate) : '–'} · változat #${st.seed}</p>`;
     if (!d.tickets.length) { out.innerHTML = days + filt + warn + `<div class="empty"><h3>Nincs szelvény</h3><p>A jelenlegi kínálatból nem állt össze a feltételeknek megfelelő kombináció.</p><button class="btn" id="regen2">Újrapróbálás más változattal</button></div>`; return; }
     out.innerHTML = days + filt + warn + info + `<div class="tickets">${d.tickets.map(ticket).join('')}</div>`;
   }

@@ -98,16 +98,19 @@ function currentTheme() {
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 function renderThemeBtn() {
-  const b = document.getElementById('themeBtn');
   const dark = currentTheme() === 'dark';
-  b.innerHTML = `${dark ? ICON.sun : ICON.moon} ${dark ? 'Világos mód' : 'Sötét mód'}`;
+  document.getElementById('themeBtn').innerHTML = `${dark ? ICON.sun : ICON.moon} ${dark ? 'Világos mód' : 'Sötét mód'}`;
+  const m = document.getElementById('themeBtnM');
+  if (m) { m.innerHTML = dark ? ICON.sun : ICON.moon; m.setAttribute('aria-label', dark ? 'Világos mód' : 'Sötét mód'); }
 }
-document.getElementById('themeBtn').addEventListener('click', () => {
+const toggleTheme = () => {
   const next = currentTheme() === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem('theme', next); } catch { /* ignore */ }
   renderThemeBtn();
-});
+};
+document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+document.getElementById('themeBtnM')?.addEventListener('click', toggleTheme);
 
 // ---------------------------------------------------------------------------
 // Navigation & router
@@ -134,7 +137,7 @@ function renderNav(active) {
     sheet.innerHTML = NAV.filter((n) => !n.sep && !n.mobile).map((n) => `<a href="${n.href}">${n.label}</a>`).join('') + '<a href="#" id="sheetTheme">Téma váltása</a>';
     document.body.append(sheet);
     e.currentTarget.setAttribute('aria-expanded', 'true');
-    sheet.querySelector('#sheetTheme').onclick = (ev) => { ev.preventDefault(); document.getElementById('themeBtn').click(); sheet.remove(); };
+    sheet.querySelector('#sheetTheme').onclick = (ev) => { ev.preventDefault(); toggleTheme(); sheet.remove(); };
     sheet.addEventListener('click', (ev) => { if (ev.target.tagName === 'A') sheet.remove(); });
   };
 }

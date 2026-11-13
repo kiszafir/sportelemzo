@@ -87,7 +87,7 @@ export async function render(el, { id }, { live, toast }) {
   }
 
   function marketsTable(a, manual) {
-    const rows = a.markets.map((mk) => {
+    const block = (mks) => mks.map((mk) => {
       const head = `<tr class="mk-head"><td colspan="9">${esc(mk.label)}${mk.overround != null ? ` <span class="muted small">· árrés ${pct(mk.overround)}</span>` : ''}</td></tr>`;
       return head + mk.selections.map((s) => {
         const quotes = s.market?.quotes || [];
@@ -95,23 +95,27 @@ export async function render(el, { id }, { live, toast }) {
         const mkey = `${mk.key}:${s.key}`;
         const title = quotes.map((q) => `${q.book}: ${q.odds}`).join(', ');
         return `<tr>
-          <td>${esc(s.name)}</td>
-          <td class="r num">${pct(s.p)}${s.pRaw != null ? `<div class="small muted" title="Nyers modellbecslés az AI-korrekció előtt">nyers ${pct(s.pRaw)}</div>` : ''}</td>
-          <td class="r num">${odds(s.fair)}</td>
-          <td class="r" title="${esc(title)}">${best ? `<span class="best num">${odds(best)}</span> <span class="muted small">${esc(s.market.book)}</span> ${badge(s.market.src)}` : '<span class="muted small">nincs</span>'}</td>
-          <td class="r num">${pct(s.novig)}</td>
-          ${s.decided ? '<td class="r muted small" colspan="3">gyakorlatilag eldőlt</td>' : `<td class="r num ${evClass(s.edge)}">${signedPct(s.edge)}</td>
-          <td class="r num ${evClass(s.ev)}">${signedPct(s.ev)} ${s.oddsSource === 'estimated' ? badge('estimated') : s.oddsSource === 'manual' ? badge('manual') : ''}</td>
-          <td class="r num">${pct(s.kelly)}</td>`}
-          <td class="r"><label class="sr-only" for="o-${esc(mkey)}">Saját szorzó: ${esc(s.name)}</label><input class="odds-input" id="o-${esc(mkey)}" data-odds-key="${esc(mkey)}" data-market="${esc(mk.key)}" data-sel="${esc(s.key)}" type="text" inputmode="decimal" placeholder="pl. 1,85" value="${manual[mkey] ? String(manual[mkey]).replace('.', ',') : ''}"></td>
+          <td class="full">${esc(s.name)}</td>
+          <td class="r num" data-label="Modell">${pct(s.p)}${s.pRaw != null ? `<div class="small muted" title="Nyers modellbecslés az AI-korrekció előtt">nyers ${pct(s.pRaw)}</div>` : ''}</td>
+          <td class="r num" data-label="Méltányos">${odds(s.fair)}</td>
+          <td class="r" data-label="Legjobb piaci" title="${esc(title)}">${best ? `<span class="best num">${odds(best)}</span> <span class="muted small">${esc(s.market.book)}</span> ${badge(s.market.src)}` : '<span class="muted small">nincs</span>'}</td>
+          <td class="r num" data-label="Piac árrés nélkül">${pct(s.novig)}</td>
+          ${s.decided ? '<td class="r muted small" colspan="3" data-label="Állapot">gyakorlatilag eldőlt</td>' : `<td class="r num ${evClass(s.edge)}" data-label="Előny">${signedPct(s.edge)}</td>
+          <td class="r num ${evClass(s.ev)}" data-label="EV">${signedPct(s.ev)} ${s.oddsSource === 'estimated' ? badge('estimated') : s.oddsSource === 'manual' ? badge('manual') : ''}</td>
+          <td class="r num" data-label="Kelly">${pct(s.kelly)}</td>`}
+          <td class="r" data-label="Saját szorzó"><label class="sr-only" for="o-${esc(mkey)}">Saját szorzó: ${esc(s.name)}</label><input class="odds-input" id="o-${esc(mkey)}" data-odds-key="${esc(mkey)}" data-market="${esc(mk.key)}" data-sel="${esc(s.key)}" type="text" inputmode="decimal" placeholder="pl. 1,85" value="${manual[mkey] ? String(manual[mkey]).replace('.', ',') : ''}"></td>
         </tr>`;
       }).join('');
     }).join('');
-    return `<div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Piacok összehasonlítása</caption><thead><tr>
+    const table = (mks, caption) => `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">${caption}</caption><thead><tr>
       <th scope="col">Kimenetel</th><th scope="col" class="r">Modell</th><th scope="col" class="r">Méltányos</th><th scope="col" class="r">Legjobb piaci</th>
       <th scope="col" class="r">Piac árrés nélkül</th><th scope="col" class="r" title="Modell − piac (árrés nélkül)">Előny</th><th scope="col" class="r">EV</th><th scope="col" class="r" title="Teljes Kelly-hányad">Kelly</th><th scope="col" class="r">Saját szorzó</th>
-    </tr></thead><tbody>${rows}</tbody></table></div>`;
+    </tr></thead><tbody>${block(mks)}</tbody></table></div>`;
+    const main = a.markets.filter((mk) => !mk.alt); const extra = a.markets.filter((mk) => mk.alt);
+    const opened = sessionStorage.getItem('moreMarkets') === '1';
+    return table(main, 'Fő piacok') + (extra.length ? `<details class="more-markets" ${opened ? 'open' : ''}><summary>További piacok (${extra.length}): ${esc([...new Set(extra.map((mk) => mk.betType))].slice(0, 6).join(', '))}</summary>${table(extra, 'További piacok')}</details>` : '');
   }
+
 
   function modelsBox(a, m) {
     const md = a.models || {};
@@ -155,16 +159,17 @@ export async function render(el, { id }, { live, toast }) {
       if (f.key === 'motivation' && f.extra) extra = `<div class="small muted">${esc(f.extra.home || '')} / ${esc(f.extra.away || '')}</div>`;
       if (f.key === 'h2h' && f.extra) extra = `<div class="small muted">${f.extra.n} meccs, ${f.extra.draws} döntetlen</div>`;
       return `<tr>
-        <td>${esc(f.label)}${extra}</td>
-        <td class="r num">${f.available ? esc(f.home) : '<span class="muted">–</span>'}</td>
-        <td class="r num">${f.available ? esc(f.away) : '<span class="muted">–</span>'}</td>
-        <td class="r num">${num(f.weight, 2)}</td>
-        <td>${f.available ? `<div class="contrib" title="${f.diff >= 0 ? 'Hazai' : 'Vendég'} irányba hat"><span class="bar ${dir}" style="width:${w.toFixed(0)}%"></span><span class="small muted">${f.diff >= 0 ? 'hazai' : 'vendég'}</span></div>` : '<span class="muted small">nem elérhető</span>'}</td>
-        <td>${src}</td></tr>`;
+        <td class="full">${esc(f.label)}${extra}</td>
+        <td class="r num" data-label="${m.sport === 'tennis' ? '1. játékos' : 'Hazai'}">${f.available ? esc(f.home) : '<span class="muted">–</span>'}</td>
+        <td class="r num" data-label="${m.sport === 'tennis' ? '2. játékos' : 'Vendég'}">${f.available ? esc(f.away) : '<span class="muted">–</span>'}</td>
+        <td class="r num" data-label="Súly">${num(f.weight, 2)}</td>
+        <td data-label="Hatás">${f.available ? `<div class="contrib" title="${f.diff >= 0 ? 'Hazai' : 'Vendég'} irányba hat"><span class="bar ${dir}" style="width:${w.toFixed(0)}%"></span><span class="small muted">${f.diff >= 0 ? 'hazai' : 'vendég'}</span></div>` : '<span class="muted small">nem elérhető</span>'}</td>
+        <td data-label="Forrás" class="span2">${src}</td></tr>`;
     }).join('');
-    return `<div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Tényezők</caption><thead><tr><th scope="col">Tényező</th><th scope="col" class="r">${m.sport === 'tennis' ? '1. játékos' : 'Hazai'}</th><th scope="col" class="r">${m.sport === 'tennis' ? '2. játékos' : 'Vendég'}</th><th scope="col" class="r">Súly</th><th scope="col">Hatás</th><th scope="col">Forrás, frissesség</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">Tényezők</caption><thead><tr><th scope="col">Tényező</th><th scope="col" class="r">${m.sport === 'tennis' ? '1. játékos' : 'Hazai'}</th><th scope="col" class="r">${m.sport === 'tennis' ? '2. játékos' : 'Vendég'}</th><th scope="col" class="r">Súly</th><th scope="col">Hatás</th><th scope="col">Forrás, frissesség</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
+  el.addEventListener('toggle', (e) => { if (e.target.classList?.contains('more-markets')) sessionStorage.setItem('moreMarkets', e.target.open ? '1' : '0'); }, true);
   el.addEventListener('change', async (e) => {
     const inp = e.target.closest('.odds-input'); if (!inp) return;
     const raw = inp.value.trim().replace(',', '.');

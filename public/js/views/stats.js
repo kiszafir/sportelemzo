@@ -62,13 +62,13 @@ export async function render(el, _a, { live }) {
   function tipTable(tips) {
     const per = 50; const pages = Math.ceil(tips.tips.length / per);
     const rows = tips.tips.slice(st.page * per, st.page * per + per).map((t) => `<tr>
-      <td>${date(t.startTime)} ${time(t.startTime)}</td><td>${SPORT_HU[t.sport]}<div class="small muted">${esc(t.leagueName)}</div></td>
-      <td>${esc(t.matchName)}${t.live ? ' <span class="badge b-live">ÉLŐ TIPP</span>' : ''}</td><td>${esc(t.name)}<div class="small muted">${esc(t.betType)} · ${t.kind === 'value' ? 'értéktipp' : 'esélyes'}</div></td>
-      <td class="r num">${odds(t.odds)}</td><td class="r num">${pct(t.p, 0)}</td><td class="r num">${t.confidence}</td>
-      <td><span class="status ${t.status === 'won' ? 'risk risk-alacsony' : t.status === 'lost' ? 'risk risk-magas' : 'st-pre'}">${RESULT_HU[t.status]}</span><div class="small muted">${esc(t.result || '')}</div></td>
-      <td>${badge(t.source === 'mock' ? 'mock' : 'live')}</td></tr>`).join('');
+      <td data-label="Időpont">${date(t.startTime)} ${time(t.startTime)}</td><td data-label="Sportág" class="span2">${SPORT_HU[t.sport]} <span class="small muted">· ${esc(t.leagueName)}</span></td>
+      <td class="full">${esc(t.matchName)}${t.live ? ' <span class="badge b-live">ÉLŐ TIPP</span>' : ''}</td><td class="full tipcol">${esc(t.name)}<div class="small muted">${esc(t.betType)} · ${t.kind === 'value' ? 'értéktipp' : 'esélyes'}</div></td>
+      <td class="r num" data-label="Szorzó">${odds(t.odds)}</td><td class="r num" data-label="Esély">${pct(t.p, 0)}</td><td class="r num" data-label="Bizalom">${t.confidence}</td>
+      <td data-label="Eredmény" class="span2"><span class="status ${t.status === 'won' ? 'risk risk-alacsony' : t.status === 'lost' ? 'risk risk-magas' : 'st-pre'}">${RESULT_HU[t.status]}</span><div class="small muted">${esc(t.result || '')}</div></td>
+      <td data-label="Forrás">${badge(t.source === 'mock' ? 'mock' : 'live')}</td></tr>`).join('');
     const pager = pages > 1 ? `<div class="toolbar" style="margin-top:10px"><button class="btn btn-small" data-page="-1" ${st.page === 0 ? 'disabled' : ''}>Előző</button><span class="small muted">${st.page + 1} / ${pages} oldal (${tips.total} tipp${tips.total > 500 ? ', az 500 legutóbbi' : ''})</span><button class="btn btn-small" data-page="1" ${st.page >= pages - 1 ? 'disabled' : ''}>Következő</button></div>` : '';
-    return `<div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Tippnapló</caption><thead><tr><th scope="col">Időpont</th><th scope="col">Sportág</th><th scope="col">Meccs</th><th scope="col">Tipp</th><th scope="col" class="r">Szorzó</th><th scope="col" class="r">Esély</th><th scope="col" class="r">Bizalom</th><th scope="col">Eredmény</th><th scope="col">Forrás</th></tr></thead><tbody>${rows}</tbody></table></div>${pager}`;
+    return `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">Tippnapló</caption><thead><tr><th scope="col">Időpont</th><th scope="col">Sportág</th><th scope="col">Meccs</th><th scope="col">Tipp</th><th scope="col" class="r">Szorzó</th><th scope="col" class="r">Esély</th><th scope="col" class="r">Bizalom</th><th scope="col">Eredmény</th><th scope="col">Forrás</th></tr></thead><tbody>${rows}</tbody></table></div>${pager}`;
   }
 
   el.querySelector('#filters').addEventListener('change', (e) => { st[e.target.name] = e.target.value; st.page = 0; load(); });

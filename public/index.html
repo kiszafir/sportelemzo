@@ -4,9 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sportelemző</title>
-  <meta name="description" content="Helyben futó sportelemző: NBA, NHL, tenisz és labdarúgás modellvalószínűségekkel, értékszámítással és szelvényépítővel. Csak tájékoztató célra.">
+  <meta name="description" content="Helyben futó sportelemző: NBA, NHL, tenisz, labdarúgás és kézilabda modellvalószínűségekkel, értékszámítással és szelvényépítővel. Csak tájékoztató célra.">
   <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#eef2f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d141b" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sportelemző">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-180.png">
   <link rel="stylesheet" href="/css/tokens.css">
   <link rel="stylesheet" href="/css/app.css">
   <script>
@@ -29,6 +37,13 @@
       </div>
     </aside>
     <div class="main">
+      <header class="mobilebar">
+        <a class="brand" href="#/" aria-label="Sportelemző – kezdőlap">
+          <svg class="brand-mark" viewBox="0 0 34 34" aria-hidden="true"><rect x="1" y="1" width="32" height="32" rx="8" fill="currentColor"/><path d="M8 24 L14 15 L19 19 L26 9" fill="none" stroke="var(--bg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="26" cy="9" r="2.6" fill="var(--amber)"/></svg>
+          <span class="brand-name">Sportelemző</span>
+        </a>
+        <button class="btn btn-small icon-btn" id="themeBtnM" type="button" aria-label="Téma váltása"></button>
+      </header>
       <div class="disclaimer" role="note">
         <span><span class="age-pill" aria-label="Csak 18 éven felülieknek">18+</span>&nbsp; <strong>Csak tájékoztató és elemző célra.</strong> Nincs garantált kimenetel; a szerencsejáték pénzügyi kockázattal jár és függőséget okozhat.</span>
         <a href="#/felelos-jatek">Felelős játék és segítség</a>

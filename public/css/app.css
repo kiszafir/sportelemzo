@@ -345,3 +345,60 @@ details.data { margin-top: 6px; font-size: .8rem; }
 .brutal-zone .seg .muted { color: #c9aab6; }
 .brutal-zone .chip { background: #26131c; color: #f6e9ee; border-color: #6b3249; }
 .brutal-zone .chip[aria-pressed="true"] { background: #ff3d7f; color: #fff; border-color: #ff3d7f; }
+
+/* ===================== Phone view ===================== */
+.mobilebar { display: none; }
+details.more-markets { margin-top: 12px; }
+details.more-markets > summary { cursor: pointer; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); font-weight: 600; list-style-position: inside; }
+details.more-markets[open] > summary { border-radius: var(--radius-m) var(--radius-m) 0 0; border-bottom: 0; }
+details.more-markets[open] > .tbl-wrap { border-radius: 0 0 var(--radius-m) var(--radius-m); }
+
+@media (max-width: 860px) {
+  .mobilebar { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: 0; z-index: 30;
+    padding: 8px 14px; padding-top: calc(8px + env(safe-area-inset-top)); background: var(--surface); border-bottom: 1px solid var(--line); }
+  .mobilebar .brand-name { font-size: 1.1rem; }
+  .mobilebar .brand-mark { width: 28px; height: 28px; }
+  .mobilebar .brand-sub { display: none; }
+  .disclaimer { padding: 6px 14px; font-size: .78rem; line-height: 1.35; }
+  .disclaimer a { white-space: nowrap; }
+  .page-head { gap: 10px; margin-bottom: 12px; }
+  .page-head .toolbar { width: 100%; }
+  .toolbar .btn { min-height: 44px; }
+  .chips { margin-right: -14px; padding-right: 14px; }
+  .chip { min-height: 40px; }
+  .seg { max-width: 100%; overflow-x: auto; }
+  .seg button { min-height: 42px; white-space: nowrap; }
+  /* compact horizontal scoreboard */
+  .scoreboard { grid-template-columns: 1fr auto 1fr; gap: 8px; padding: 14px 12px; text-align: left; }
+  .scoreboard .side.away { text-align: right; }
+  .scoreboard .tname { font-size: 1.05rem; }
+  .scoreboard .big { font-size: 2rem; }
+  .tip-hero .tip-title { font-size: 1.2rem; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi .v { font-size: 1.3rem; }
+  .card { padding: 14px; }
+  .modal { padding: 18px; }
+  .tickets { grid-template-columns: 1fr; }
+  .brutal-zone { padding: 16px 12px; margin: 0 -6px; }
+  .odds-input { width: 100%; min-height: 40px !important; }
+  input, select, textarea { font-size: 16px; } /* no iOS zoom on focus */
+}
+
+/* tables turn into cards on phones */
+@media (max-width: 640px) {
+  .tbl-wrap:has(.tbl.stack) { overflow: visible; border: 0; background: transparent; }
+  .tbl.stack, .tbl.stack tbody { display: block; width: 100%; }
+  .tbl.stack thead { display: none; }
+  .tbl.stack tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; padding: 12px; margin-bottom: 8px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); }
+  .tbl.stack td { display: block; border: 0; padding: 0; text-align: left !important; min-width: 0; overflow-wrap: anywhere; }
+  .tbl.stack td[data-label]::before { content: attr(data-label); display: block; font-size: .7rem; color: var(--muted); margin-bottom: 1px; }
+  .tbl.stack td.full { grid-column: 1 / -1; font-weight: 600; }
+  .tbl.stack td.tipcol { font-weight: 400; }
+  .tbl.stack td.span2 { grid-column: span 2; }
+  .tbl.stack td[colspan] { grid-column: span 2; }
+  .tbl.stack tr.mk-head { display: block; background: transparent; border: 0; padding: 14px 2px 4px; margin: 0; }
+  .tbl.stack tr.mk-head td { font-weight: 700; font-size: .95rem; }
+  .tbl.stack .contrib { min-width: 0; }
+  details.more-markets[open] > summary { border-radius: var(--radius-m); border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+}

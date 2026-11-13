@@ -163,7 +163,7 @@ function buildInsights(models, factors) {
       const S = SPORT_HU[sport];
       for (const [fam, m] of Object.entries(fams)) {
         const M = m.metrics; if (!M || M.n < 40) continue;
-        const F = FAMILY_HU[fam];
+        const F = sport === 'tennis' && fam === 'btts' ? 'mindkét játékos nyer szettet' : sport === 'tennis' && fam === 'totals' ? 'összes játék' : FAMILY_HU[fam];
         // 1) calibration problems
         const bad = (M.calAll || []).filter((b) => b.n >= 15 && Math.abs(b.actual - b.predicted) >= 0.08)
           .sort((a, b) => Math.abs(b.actual - b.predicted) * Math.sqrt(b.n) - Math.abs(a.actual - a.predicted) * Math.sqrt(a.n))[0];

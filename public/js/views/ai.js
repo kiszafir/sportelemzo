@@ -67,7 +67,7 @@ export async function render(el, _a, { toast }) {
           const M = r.metrics;
           const state = r.active ? '<span class="badge b-live">AKTÍV</span>' : r.reason === 'collecting' ? `<span class="badge b-na">GYŰJT (${M.n}/${M.need})</span>` : '<span class="badge b-cached">NEM JAVÍTOTT – KI</span>';
           const share = r.metrics.marketShare > 0.2 ? `${pct(r.interp.modelShare, 0)} / ${pct(r.interp.marketShare, 0)}` : `${pct(1, 0)} / – <span class="small muted">(kevés piaci szorzó)</span>`;
-          return `<tr><td>${SPORT_HU[r.sport]}</td><td>${FAMILY_HU[r.fam]}</td><td class="r num">${M.n}</td><td>${state}</td>
+          return `<tr><td>${SPORT_HU[r.sport]}</td><td>${r.sport === 'tennis' && r.fam === 'btts' ? 'Mindkét játékos nyer szettet' : r.sport === 'tennis' && r.fam === 'totals' ? 'Összes játék' : FAMILY_HU[r.fam]}</td><td class="r num">${M.n}</td><td>${state}</td>
             <td class="r num">${M.llRaw != null ? `${num(M.llRaw, 3)} → <strong class="${M.gain > 0 ? 'ev-pos' : ''}">${num(M.llAi, 3)}</strong>` : '–'}</td>
             <td class="r num">${M.brierRaw != null ? `${num(M.brierRaw, 3)} → ${num(M.brierAi, 3)}` : '–'}</td>
             <td>${r.reason === 'collecting' ? '–' : share}${r.reason !== 'collecting' && r.interp.sharpness < 0.9 ? ' <span class="small muted">· óvatosabbá teszi</span>' : r.reason !== 'collecting' && r.interp.sharpness > 1.1 ? ' <span class="small muted">· határozottabbá teszi</span>' : ''}</td>

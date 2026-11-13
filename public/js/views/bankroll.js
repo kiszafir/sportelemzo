@@ -62,11 +62,11 @@ export async function render(el, _a, { toast }) {
   }
 
   function betsTable(bets) {
-    return `<div class="tbl-wrap"><table class="tbl"><caption class="sr-only">Fogadások</caption><thead><tr><th scope="col">Dátum</th><th scope="col">Leírás</th><th scope="col" class="r">Szorzó</th><th scope="col" class="r">Tét</th><th scope="col">Eredmény</th><th scope="col" class="r">Nyereség</th><th scope="col" class="r">Egyenleg</th><th scope="col">Műveletek</th></tr></thead><tbody>
-      ${bets.map((x) => `<tr><td>${date(x.createdAt)} ${time(x.createdAt)}</td><td>${esc(x.description)}${x.tipId ? '<div class="small muted">modelltipphez kötve – automatikusan elszámolódik</div>' : ''}</td>
-        <td class="r num">${odds(x.odds)}</td><td class="r num">${huf(x.stake)}</td><td>${RESULT_HU[x.status]}</td>
-        <td class="r num ${evClass(x.profit)}">${x.status === 'pending' ? '–' : huf(x.profit)}</td><td class="r num">${huf(x.runningBalance)}</td>
-        <td><div style="display:flex;gap:4px;flex-wrap:wrap">${x.status === 'pending' ? `<button class="btn btn-small" data-settle="won" data-id="${x.id}">Nyert</button><button class="btn btn-small" data-settle="lost" data-id="${x.id}">Veszített</button><button class="btn btn-small" data-settle="void" data-id="${x.id}">Érvénytelen</button>` : `<button class="btn btn-small" data-settle="pending" data-id="${x.id}">Visszanyitás</button>`}<button class="btn btn-small" data-del="${x.id}" aria-label="Törlés: ${esc(x.description)}">Törlés</button></div></td></tr>`).join('')}
+    return `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">Fogadások</caption><thead><tr><th scope="col">Dátum</th><th scope="col">Leírás</th><th scope="col" class="r">Szorzó</th><th scope="col" class="r">Tét</th><th scope="col">Eredmény</th><th scope="col" class="r">Nyereség</th><th scope="col" class="r">Egyenleg</th><th scope="col">Műveletek</th></tr></thead><tbody>
+      ${bets.map((x) => `<tr><td data-label="Dátum" class="span2">${date(x.createdAt)} ${time(x.createdAt)}</td><td class="full">${esc(x.description)}${x.tipId ? '<div class="small muted">modelltipphez kötve – automatikusan elszámolódik</div>' : ''}</td>
+        <td class="r num" data-label="Szorzó">${odds(x.odds)}</td><td class="r num" data-label="Tét">${huf(x.stake)}</td><td data-label="Eredmény">${RESULT_HU[x.status]}</td>
+        <td class="r num ${evClass(x.profit)}" data-label="Nyereség">${x.status === 'pending' ? '–' : huf(x.profit)}</td><td class="r num" data-label="Egyenleg">${huf(x.runningBalance)}</td>
+        <td class="full"><div style="display:flex;gap:4px;flex-wrap:wrap">${x.status === 'pending' ? `<button class="btn btn-small" data-settle="won" data-id="${x.id}">Nyert</button><button class="btn btn-small" data-settle="lost" data-id="${x.id}">Veszített</button><button class="btn btn-small" data-settle="void" data-id="${x.id}">Érvénytelen</button>` : `<button class="btn btn-small" data-settle="pending" data-id="${x.id}">Visszanyitás</button>`}<button class="btn btn-small" data-del="${x.id}" aria-label="Törlés: ${esc(x.description)}">Törlés</button></div></td></tr>`).join('')}
     </tbody></table></div>`;
   }
 

@@ -62,6 +62,11 @@ export function normaliseFixture(it, league, fetchedAt, status) {
     void: VOID.has(short) || undefined,
     dataStatus: status, fetchedAt,
   };
+  if (short === 'AET' || short === 'PEN') {
+    m.extraTime = true;
+    const ft = it.score?.fulltime; // 90-minute score
+    if (Number.isFinite(ft?.home) && Number.isFinite(ft?.away)) m.regScore = { home: ft.home, away: ft.away };
+  }
   if (st === 'live') {
     const min = Number(f.status?.elapsed) || 0;
     m.live = { minute: min, elapsedMin: min, clock: m.statusText, periodLabel: short === '1H' ? '1. félidő' : short === 'HT' ? 'Félidő' : short === '2H' ? '2. félidő' : 'Hosszabbítás', redCards: { home: 0, away: 0 } };
@@ -123,11 +128,25 @@ class ApiSportsProvider extends Provider {
 
   get(url) { return getJson('apisports', url, { headers: { 'x-apisports-key': this.key }, retries: 1 }).then(checkApiErrors); }
 
+  /** League id + season: fixed id, or looked up by country + name (e.g. Magyar Kupa), cached 30 days. */
+  async resolveLeague(league) {
+    if (league.as) return { id: league.as, season: currentSeason() };
+    if (!league.asLookup) return null;
+    const { country, name } = league.asLookup;
+    const res = await cache.wrap(`apisports:leagues:${country}`, 30 * 24 * 3600e3, () => this.get(`${BASE}/leagues?country=${encodeURIComponent(country)}`));
+    const want = norm(name);
+    const hit = (res.value?.response || []).find((x) => norm(x.league?.name).includes(want));
+    if (!hit) { const e = new HttpError(`API-Football: nem található bajnokság (${country} / ${name})`, 404); e.fatal = true; throw e; }
+    const season = (hit.seasons || []).find((x) => x.current)?.year ?? currentSeason();
+    return { id: hit.league.id, season };
+  }
+
   /** Fixtures yesterday … +3 days (one request). */
   async fixtures(league, { hasLive = false } = {}) {
-    if (!league.as) return null;
+    const L = await this.resolveLeague(league);
+    if (!L) return null;
     const now = Date.now();
-    const url = `${BASE}/fixtures?league=${league.as}&season=${currentSeason()}&from=${isoDay(now - 864e5)}&to=${isoDay(now + 3 * 864e5)}&timezone=UTC`;
+    const url = `${BASE}/fixtures?league=${L.id}&season=${L.season}&from=${isoDay(now - 864e5)}&to=${isoDay(now + 3 * 864e5)}&timezone=UTC`;
     try {
       const res = await cache.wrap(`apisports:fx:${league.id}`, (hasLive ? 5 : 30) * 60e3, () => this.get(url));
       this.ok();

@@ -11,6 +11,7 @@
   "scripts": {
     "start": "node server/index.js",
     "mock": "node server/index.js --mock",
+    "telefon": "node server/index.js --lan",
     "dev": "node --watch server/index.js",
     "test": "node --test",
     "backtest": "node scripts/backtest.js",

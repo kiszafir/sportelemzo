@@ -61,6 +61,18 @@ export function normaliseTeamEvent(ev, league, now) {
       m.live.fouls = { home: st(home, 'foulsCommitted'), away: st(away, 'foulsCommitted') };
     }
   }
+  // Cup matches decided after extra time / penalties: markets settle on the 90-minute
+  // score, taken from the per-half linescores when ESPN provides them.
+  if (league.sport === 'football' && state === 'post') {
+    const st = comp.status?.type || {};
+    if (/AET|PEN/i.test(st.name || '') || /AET|pen|extra/i.test(`${st.detail || ''} ${st.shortDetail || ''}`)) {
+      m.extraTime = true;
+      const reg = (c) => { const ls = (c.linescores || []).map((x) => Number(x.value)); return ls.length >= 2 && ls.slice(0, 2).every(Number.isFinite) ? ls[0] + ls[1] : null; };
+      const rh = reg(home); const ra = reg(away);
+      if (rh != null && ra != null) m.regScore = { home: rh, away: ra };
+      m.statusText = /PEN/i.test(st.name || '') || /pen/i.test(st.detail || '') ? 'Vége (11-esek)' : 'Vége (hossz.)';
+    }
+  }
   // Player leaders: NBA points per game (player props), NHL season goals (goalscorer market).
   const leader = (c, rx) => {
     const L = (c.leaders || []).find((l) => rx.test(l.name || '') || rx.test(l.abbreviation || ''));

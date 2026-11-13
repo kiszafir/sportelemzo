@@ -3,6 +3,7 @@
 Helyben futó, magyar nyelvű sportelemző és szelvényépítő öt sportágra:
 - **NBA**, **NHL**, **tenisz** (ATP/WTA),
 - **labdarúgás:** Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Bajnokok Ligája, Európa-liga, Konferencia-liga, Eredivisie, Primeira Liga, Championship, Süper Lig, Jupiler Pro League, skót Premiership, MLS, NB I,
+  **Nemzetek Ligája**, és kupák: FA-kupa, angol Ligakupa, Copa del Rey, Olasz Kupa, DFB-Pokal, Francia Kupa, Copa Libertadores, Magyar Kupa,
 - **kézilabda:** férfi és női EHF Bajnokok Ligája, férfi és női NB I, Handball-Bundesliga.
 Modellvalószínűséget, méltányos szorzót, árrés nélküli piaci valószínűséget, értéket (EV), bizalmi pontszámot és magyar nyelvű indoklást ad meccsenként, és „Könnyű” (≤ 10,00) valamint „Brutális” (≥ 70,00) kombinált szelvényeket generál.
 
@@ -25,13 +26,27 @@ Az alkalmazásnak **nincs külső függősége**, ezért az `npm install` gyakor
 | Parancs | Mit csinál |
 |---|---|
 | `npm start` | Indítás automatikus adatmódban (élő források, hiba esetén mintaadat) |
-| `npm run mock` | Indítás tisztán mintaadattal, hálózat nélkül |
+| `npm run telefon` | Indítás telefonos eléréssel: ugyanazon a Wi-Fin a telefonról is megnyitható (PIN-kóddal védve, lásd lent) |
+| `npm run mock` | Indítás tisztán mintaadattal, hálózat nélkül (demó: itt a szelvények is mintameccsekből készülnek) |
 | `npm test` | Egységtesztek (szorzómatematika, modellek, kombinációs motor, adatforrás-normalizálás) |
 | `npm run verify` | Végponttól végpontig tartó ellenőrzés mintaadat-módban, ideiglenes adatmappával |
 | `npm run backtest` | Visszatesztelés (lásd 7. pont) |
 | `npm run dev` | Indítás fájlfigyeléssel (fejlesztéshez) |
 
 Másik port: `PORT=3001 npm start` (Windows PowerShell: `$env:PORT=3001; npm start`).
+
+### Telefonos használat
+
+1. Indítsd a gépen: `npm run telefon`
+2. A terminál kiírja a címet (pl. `http://192.168.1.23:3000`) és egy **6 jegyű PIN-kódot**.
+3. A telefonon (ugyanazon a Wi-Fin) nyisd meg a címet, és írd be a PIN-t. A telefon 30 napig belépve marad.
+4. Tipp: a böngésző menüjében válaszd a „Hozzáadás a kezdőképernyőhöz” lehetőséget, így alkalmazásként, teljes képernyőn nyílik meg.
+
+A felület telefonon kártyás elrendezésre vált (táblázatok helyett kártyák, kompakt eredményjelző, alsó menüsor). A PIN a `data/local-secrets.json` fájlban van (nem kerül GitHubra); saját PIN-t az `.env`-ben adhatsz meg: `ACCESS_PIN=123456`. A gép tűzfala rákérdezhet, hogy engedélyezed-e a bejövő kapcsolatot – engedélyezd. Csak megbízható (otthoni) hálózaton használd.
+
+### GitHub
+
+A projekt a https://github.com/kiszafir/sportelemzo repóban van, a tanult adatokkal együtt (`data/db.json`, `data/ai.json`, `data/history.json`). Az `.env` (API-kulcsok), a `data/local-secrets.json` (telefonos PIN) és a gyorsítótár soha nem kerül fel. Másik gépen: `git clone https://github.com/kiszafir/sportelemzo && cd sportelemzo && npm start`, majd az `.env` fájlt külön kell létrehozni.
 
 ## 2. Adatmódok és jelölések
 
@@ -59,7 +74,7 @@ Kulcs nélkül minden funkció működik. A kulcsok csak gazdagítják az adatot
 | `API_SPORTS_KEY` | API-Sports (API-Football + API-Handball) | NB I meccsek és tabella, sérülések/eltiltások (foci), **kézilabda** meccsek és tabellák | 100 kérés/nap API-nként | https://api-sports.io |
 | `FOOTBALL_DATA_KEY` | football-data.org | Tabella, pont/meccs, gólok, forma (PL, La Liga, Serie A, Bundesliga, Ligue 1, BL) | 10 kérés/perc | https://www.football-data.org |
 
-**Az ESPN nem közli** az NB I-et és a kézilabdát. Ezekhez az `API_SPORTS_KEY` kell (ugyanaz a kulcs az API-Football és az API-Handball szolgáltatáshoz, mindkettőnek külön napi kerete van); kulcs nélkül ezek a bajnokságok MINTA jelöléssel futnak. A kézilabda-bajnokságokat a program ország és név alapján keresi meg az API-Handballban, a napi meccslistát pedig egyetlen kéréssel kéri le az összes bajnokságra. Ha az ingyenes csomag nem engedi az aktuális szezont, az API-Sports hibaüzenete az Adatforrások oldalon látszik.
+**Az ESPN nem közli** az NB I-et, a Magyar Kupát és a kézilabdát. Ezekhez az `API_SPORTS_KEY` kell (ugyanaz a kulcs az API-Football és az API-Handball szolgáltatáshoz, mindkettőnek külön napi kerete van); kulcs nélkül ezek a bajnokságok MINTA jelöléssel futnak. A kézilabda-bajnokságokat a program ország és név alapján keresi meg az API-Handballban, a napi meccslistát pedig egyetlen kéréssel kéri le az összes bajnokságra. Ha az ingyenes csomag nem engedi az aktuális szezont, az API-Sports hibaüzenete az Adatforrások oldalon látszik.
 
 **Kvótakímélés:** minden szolgáltató saját sebességkorláttal, napi kerettel, exponenciális visszalépéssel (backoff) és „circuit breakerrel” fut (3 egymás utáni hiba után 5 perc szünet). The Odds API alapból csak `h2h` piacot kér (1 kredit/kérés), csak olyan bajnokságra, amelynek 36 órán belül meccse van, bajnokságonként 12 óránként, napi max. 15 kredit – ez havi ~450 kredit. A sok bajnokság miatt egy napon nem mindegyik kap piaci szorzót; a keret a `ODDS_API_DAILY_CREDITS` értékkel emelhető, ha nagyobb csomagod van. A sportkulcsokat (kézilabdáét is) a program a díjmentes `/sports` végpontból ellenőrzi. Állítható: `ODDS_API_MARKETS`, `ODDS_API_TTL_HOURS`, `ODDS_API_DAILY_CREDITS`. Bármely szolgáltató kikapcsolható: `PROVIDER_ODDSAPI=off` stb.
 
@@ -83,6 +98,8 @@ A felület **Adatforrások** oldala megmutatja, melyik szolgáltató aktív, mik
 - **Frissítés:** élő meccseknél 45 másodpercenként (Server-Sent Events, kiesés esetén lekérdezés), kézi „Frissítés” gomb, „Utolsó frissítés” időbélyeg.
 - **Kiegészítő piacok minden sportágban:** gólszerző (foci, NHL), játékos pontjai (NBA) / góljai (kézilabda), hendikep (ázsiai, puck line, játékhendikep), több over/under vonal és csapatonkénti gólszám/pontszám, mindkét csapat gól (foci, NHL; teniszben „mindkét játékos nyer szettet”), sárga lapok (foci).
 - **Piacszűrő a mixekben:** kiválasztható, milyen piactípusokból álljon a szelvény (pl. csak gólszerző és sárga lap).
+- **Csak valós meccsek a szelvényeken:** a Könnyű és a Brutális mix kizárólag élő forrásból származó meccsekből épít; a mintaadatra visszaesett bajnokságok meccsei kimaradnak (ezt a mix oldala jelzi). Kivétel a kifejezett demó mód (`npm run mock`).
+- **Kupák és hosszabbítás:** kupameccseken minden piac a 90 perces eredményre számolódik el; hosszabbítás/tizenegyesek után a rendes játékidő eredménye (ESPN félidős részeredményekből, API-Football `fulltime`) számít, ha nem ismert, a tipp érvénytelen. Kupameccsen a csapatok hazai bajnoki statisztikáit használja a modell, ha az a bajnokság is be van töltve.
 - **Egy nap, egy szelvény:** minden mix-szelvény meccsei ugyanazon a napon kezdődnek; a napot (Ma / Holnap / Holnapután) a mix oldalán lehet váltani.
 - **AI-motor:** helyi, önállóan tanuló réteg (lásd lent).
 - **Könnyű mix:** 2–6 tétel, eredő szorzó ≤ 10,00, nagy valószínűségű tételek (favorit, kettős esély, gólszám, legalább egy szett / szettveszteség nélküli győzelem). Tételek rögzíthetők lakattal, a többi újragenerálható.
