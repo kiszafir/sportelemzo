@@ -2,6 +2,7 @@
 // alternative and team totals, both-teams-to-score and yellow cards.
 // Builders read the distributions the main models left in `ctx`.
 import { normCdf, clamp } from './mathutil.js';
+import { playerProps } from './props.js';
 
 export const YELLOW_BASE = { epl: 1.9, laliga: 2.5, seriea: 2.3, bundesliga: 2.0, ligue1: 1.9, ucl: 1.8, uel: 1.9, uecl: 2.0, eredivisie: 1.7, primeira: 2.4, championship: 2.0, superlig: 2.4, belgium: 2.0, scotland: 1.8, mls: 2.0, nbi: 2.3, unl: 1.9, facup: 1.8, eflcup: 1.8, copadelrey: 2.4, coppaitalia: 2.2, dfbpokal: 2.0, cdf: 1.9, libertadores: 2.6, mkupa: 2.2 };
 
@@ -136,6 +137,7 @@ function normalExtras(match, ctx, { unit, alt, playerKey, playerLabel }) {
   if (match.status !== 'pre') return out; // player props: pre-match only
   for (const side of ['home', 'away']) {
     const st = match.stats?.[side] || {};
+    if (st.roster?.length) continue; // NBA with box-score profiles: the full player-prop set (props.js) replaces this
     const teamMu = side === 'home' ? muH : muA;
     const scale = Number.isFinite(st.ppg) && unit === 'pont' ? clamp(teamMu / st.ppg, 0.85, 1.15) : Number.isFinite(st.gfPg) && unit === 'gól' ? clamp(teamMu / st.gfPg, 0.85, 1.15) : 1;
     for (const pl of (st.players || []).filter((p) => Number.isFinite(p[playerKey])).slice(0, 2)) {
@@ -236,12 +238,16 @@ function tennisExtras(match, ctx) {
   return out;
 }
 
+function safeProps(match, ctx) {
+  try { return playerProps(match, ctx); } catch (err) { ctx.notes.push('Játékospiacok nem számolhatók: ' + err.message); return []; }
+}
+
 export function extraMarkets(match, ctx) {
   try {
     switch (match.sport) {
       case 'football': return ctx.mat ? footballExtras(match, ctx) : [];
-      case 'nhl': return ctx.mat ? nhlExtras(match, ctx) : [];
-      case 'nba': return ctx.dist ? normalExtras(match, ctx, { unit: 'pont', alt: 6, playerKey: 'ppg', playerLabel: 'pontjai' }) : [];
+      case 'nhl': return ctx.mat ? [...nhlExtras(match, ctx), ...safeProps(match, ctx)] : [];
+      case 'nba': return ctx.dist ? [...normalExtras(match, ctx, { unit: 'pont', alt: 6, playerKey: 'ppg', playerLabel: 'pontjai' }), ...safeProps(match, ctx)] : [];
       case 'handball': return ctx.dist ? normalExtras(match, ctx, { unit: 'gól', alt: 3, playerKey: 'gpg', playerLabel: 'góljai' }) : [];
       case 'tennis': return tennisExtras(match, ctx);
       default: return [];

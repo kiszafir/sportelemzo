@@ -3,6 +3,7 @@
 // Markets whose result data is missing (e.g. no goalscorer list from the
 // provider) are settled as 'void', never guessed.
 import { parseSetScores } from './extras.js';
+import { statValue } from './props.js';
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]+/g, ' ').trim();
 /** Same player? Full-name match, or same surname + same first initial ("K. Mbappé" vs "Kylian Mbappé"). */
@@ -75,9 +76,11 @@ export function settleSelection(match, marketKey, selKey, line) {
         const c = match.cards; if (!c || !Number.isFinite(c.home) || !Number.isFinite(c.away)) return 'void';
         return overUnder(c.home + c.away, line, selKey);
       }
+      if (marketKey.startsWith('pp:')) return settlePlayerProp(match, marketKey, selKey, line);
       if (marketKey.startsWith('pl:')) {
         // player points (NBA) / goals (handball): void when the player has no stat line
-        const [, , pslug] = marketKey.split(':');
+        const [, side, pslug] = marketKey.split(':');
+        if (match.box?.[side]) return settlePlayerProp(match, `pp:${side}:${pslug}:pts`, selKey, line);
         const stats = match.playerPoints || match.playerGoals; if (!stats) return 'void';
         const name = Object.keys(stats).find((n) => norm(n).replace(/ /g, '-') === pslug || samePlayer(n, pslug.replace(/-/g, ' ')));
         return name ? overUnder(Number(stats[name]), line, selKey) : 'void';
@@ -86,3 +89,26 @@ export function settleSelection(match, marketKey, selKey, line) {
       return null;
   }
 }
+
+/**
+ * Player prop pp:<side>:<slug>:<stat>[line] against the box score.
+ * No box score yet → null (wait) while it may still arrive, then void.
+ * Player did not play (DNP / not in the box) → void, as at most bookmakers.
+ */
+function settlePlayerProp(match, marketKey, selKey, line) {
+  const [, side, pslug, rawStat = ''] = marketKey.split(':');
+  const stat = rawStat.replace(/\d+$/, '');
+  if (!match.box) return match.boxState === 'pending' ? null : 'void';
+  const players = match.box[side]?.players || {};
+  const name = Object.keys(players).find((n) => norm(n).replace(/ /g, '-') === pslug.replace(/[^a-z-]/g, '') || samePlayer(n, pslug.replace(/-/g, ' ')));
+  const row = name ? players[name] : null;
+  if (!row || row.dnp) return 'void';
+  const v = statValue(row, stat);
+  if (v == null) return 'void';
+  if (stat === 'dd') return (selKey === 'yes') === (v >= 2) ? 'won' : 'lost';
+  if (stat === 'td') return (selKey === 'yes') === (v >= 3) ? 'won' : 'lost';
+  return overUnder(v, line, selKey);
+}
+
+/** True while a finished match still waits for its box score (player markets). */
+export const awaitingBox = (match) => match?.status === 'post' && !match.box && match.boxState === 'pending';

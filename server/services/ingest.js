@@ -14,6 +14,7 @@ import { logTips, settleTips, seedMockHistory, archiveFinished, cardHistory } fr
 import { YELLOW_BASE } from '../engine/extras.js';
 import { localDay } from '../lib/time.js';
 import { recordSnapshot, labelFinished, maybeTrain, adjusterFor } from './learn.js';
+import { applyPlayerData, syncLeague, syncDue } from './players.js';
 
 const log = createLogger('ingest');
 
@@ -130,6 +131,17 @@ async function enrichLive(league, matches, allMatches) {
   let scorers = null;
   try { if (league.sport === 'football' && P.apisports.enabled() && spare() && (startsWithin(36) || matches.some((m) => m.status === 'live'))) scorers = await P.apisports.topScorers(league); } catch { scorers = null; }
   const cards = league.sport === 'football' ? cardHistory() : null;
+  // NBA / NHL: fresh injury report (one request per league, 30 min) + box-score
+  // based player profiles. Missing box scores are fetched in the background; the
+  // league is re-analysed when they arrive.
+  let nbaInj = null;
+  if ((league.sport === 'nba' || league.sport === 'nhl') && P.espn.enabled() && league.espn) {
+    try { if (matches.some((m) => m.status !== 'post')) nbaInj = await P.espn.injuries(league); } catch { nbaInj = null; }
+    lastInjuries.set(league.id, nbaInj);
+    if (syncDue(league.id) || matches.some((m) => m.status === 'post' && !m.box)) {
+      syncLeague(league, matches, P.espn).then((n) => { if (n) reapplyPlayers(league); }).catch((err) => log.warn('box-score sync failed', { league: league.id, err }));
+    }
+  }
 
   // Back-to-back detection from the fetched window (team played the previous day).
   const playedOn = new Map();
@@ -184,6 +196,7 @@ async function enrichLive(league, matches, allMatches) {
         if (l && Number.isFinite(st.gfPg) && st.gamesPlayed) st.players = [{ name: l.name, share: Math.min(0.4, l.value / (st.gfPg * st.gamesPlayed)), starter: 0.95 }];
       }
     }
+    if (league.sport === 'nba' || league.sport === 'nhl') applyPlayerData(league, m, nbaInj);
     // Yellow-card averages from archived matches, shrunk towards the league average (k = 4 matches).
     if (cards) {
       const prior = YELLOW_BASE[league.id] ?? 2.0;
@@ -207,6 +220,18 @@ async function enrichLive(league, matches, allMatches) {
       if (w) { m.weather = w; m.meta.weather = { status: w.status, fetchedAt: w.fetchedAt, src: 'Open-Meteo' }; if (w.altitude != null) m.venue.altitude = w.altitude; }
     }
   }
+}
+
+const lastInjuries = new Map();
+/** Box scores arrived in the background: refresh rosters / box scores of the league and re-analyse. */
+function reapplyPlayers(league) {
+  let n = 0;
+  for (const m of state.matches.values()) {
+    if (m.league !== league.id || m.provider === 'mock') continue;
+    applyPlayerData(league, m, lastInjuries.get(league.id));
+    try { state.analyses.set(m.id, analyse(m)); n++; } catch (err) { log.error('analysis failed', { id: m.id, err }); }
+  }
+  if (n) { state.version++; emit({ type: 'update', version: state.version, lastUpdate: state.lastUpdate || Date.now(), partial: true }); }
 }
 
 function addMotivation(m) {

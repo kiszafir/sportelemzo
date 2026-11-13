@@ -31,7 +31,9 @@ export function momentum(results = []) {
   return avg(last3) - avg(prev);
 }
 
-const injuryLoad = (list) => (Array.isArray(list) ? list.reduce((s, i) => s + (i.impact ?? 0.3) * (i.status === 'kétséges' ? 0.5 : 1), 0) : null);
+// Injury load: Σ impact × P(misses the game). ESPN entries carry playProb (out 0, doubtful 0.25,
+// questionable 0.5, day-to-day 0.6, probable 0.85); older entries only a status.
+const injuryLoad = (list) => (Array.isArray(list) ? list.reduce((s, i) => s + (i.impact ?? 0.3) * (Number.isFinite(i.playProb) ? 1 - i.playProb : i.status === 'kétséges' ? 0.5 : 1), 0) : null);
 
 // --- factor definitions -----------------------------------------------------
 // Each definition: [key, label, group, weight, fn(h, a, m) -> {diff, home, away} | null, fmt]

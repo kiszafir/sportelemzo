@@ -67,7 +67,7 @@ gólszám ~ N(T, 6,0²)</code>
   <h3>Kiegészítő piacok</h3>
   <ul>
     <li><strong>Gólszerző (foci, NHL), bármikor:</strong> <code>P = 1 − e^(−λ_csapat · részesedés · játékidő-arány)</code>, ahol a részesedés a játékos góljai / a csapat góljai (élő adatnál az API-Sports góllövőlistájából, NHL-nél az ESPN gólkirályából), a játékidő-arány a lejátszott percek / (meccsek · 90). Élő meccsen a hátralévő λ számít; aki már gólt szerzett, annál a tipp eldőlt.</li>
-    <li><strong>Játékos pontjai (NBA) / góljai (kézilabda):</strong> az átlag a várható csapatpontszám és a szezonátlag arányával skálázva; NBA: normális eloszlás 27%-os szórással, kézilabda: Poisson. Csak meccs előtt.</li>
+    <li><strong>Játékos góljai (kézilabda):</strong> az átlag a várható csapatgólszám és a szezonátlag arányával skálázva, Poisson. Csak meccs előtt.</li>
     <li><strong>Hendikep:</strong> foci: ázsiai hendikep a gólmátrixból (az 50%-hoz legközelebbi félvonal); NHL: ±1,5 (puck line) a hosszabbítást is számolva; tenisz: játékhendikep.</li>
     <li><strong>Over/under:</strong> több vonal meccsre és csapatonként (foci, NHL: gólmátrix; NBA, kézilabda: normális közelítés; tenisz: összes játék).</li>
     <li><strong>Mindkét csapat gól:</strong> foci és NHL a gólmátrixból; teniszben a megfelelője „mindkét játékos nyer szettet”. NBA-ben és kézilabdában nincs értelme, ezért nincs.</li>
@@ -76,6 +76,17 @@ gólszám ~ N(T, 6,0²)</code>
     <li><strong>Kupák, hosszabbítás:</strong> minden focipiac 90 perces; hosszabbítás vagy tizenegyesek után a rendes játékidő eredménye számít, ha ismert, különben a tipp érvénytelen (gólszerző és lapok ilyenkor mindig érvénytelenek). Kupameccsen a hazai bajnoki statisztikákat kölcsönözzük.</li>
     <li><strong>Elszámolás:</strong> ha a szolgáltató nem ad gólszerzőlistát, lapszámot vagy játékosstatisztikát, az ilyen tipp <em>érvénytelen</em>, nem „veszített”. A gólszerzőlistát csak akkor fogadjuk el, ha minden gólt megmagyaráz.</li>
     <li>A kiegészítő piacok nem kerülnek a napi ajánlások közé (azok a fő piacokból jönnek), de a meccs adatlapján és a mixekben elérhetők.</li>
+  </ul>
+  <h3>NBA és NHL játékospiacok, friss hiányzók</h3>
+  <ul>
+    <li><strong>Adat:</strong> a csapatok legutóbbi (legfeljebb 15) meccsének box score-ja az ESPN-ről, a frissebb meccs nagyobb súllyal (0,88ⁱ). Ebből játékosonként: percek, pont, lepattanó, gólpassz, dobott hárompontos, szerzett labda, blokk (NHL: jégidő, gól, gólpassz, kapura lövés), valamint a dupla-/tripla-dupla gyakoriság és a <em>frissesség</em> (a súlyozott meccsek mekkora részén játszott).</li>
+    <li><strong>Friss sérüléslista:</strong> az ESPN ligaszintű jelentése 30 percenként. Státusz → játszási esély: kiesik / eltiltva 0, kétséges (doubtful) 0,25, kérdéses (questionable) 0,5, day-to-day 0,6, valószínű 0,85. A sérülés súlya a játékos részesedése a csapat termeléséből (NBA: pont + 0,5·lepattanó + 0,7·gólpassz, NHL: gól + 0,7·gólpassz) × frissesség; a „Sérülések” tényező ebből számol: <code>Σ súly · (1 − játszási esély)</code>. Aki régóta hiányzik, annak a hiánya már benne van az átlagokban, ezért alig számít; aki a legutóbbi meccseken még játszott, az <strong>friss hiányzó</strong>.</li>
+    <li><strong>Szerep-újraelosztás:</strong> a kieső játékos perceinek 85%-a a rotáció tagjaihoz kerül (eddigi perceik arányában, max. 40 perc), a pontok/lepattanók/gólpasszok pedig úgy skálázódnak, hogy a csapat összesen a megszokott szintet hozza (a tehetségvesztés miatt 12%·hiányarány levonással; játékosonként legfeljebb +30%).</li>
+    <li><strong>Meccskörnyezet:</strong> a modell várható csapatpontszáma (NHL: várható gól) / a csapat friss átlaga skálázza a pontokat és gólpasszokat (NBA 0,88–1,12, NHL 0,8–1,25); nagy várható különbségnél (bedarálás) a kezdők percei kissé csökkennek.</li>
+    <li><strong>Eloszlás:</strong> <code>X ~ NegBin(μ·F, r)</code>, ahol a közös percfaktor <code>F ~ LogNormal(σ = 0,15 + 0,004·|várható különbség|)</code> (7 pontos Gauss–Hermite), így egy játékos statjai a játékidőn keresztül korrelálnak. r: pont 30, lepattanó 14, gólpassz 10, hárompontos 9. A PR, PRA, RA pontos konvolúció; a dupla-/tripla-dupla a pont, lepattanó, gólpassz, szerzett labda, blokk ≥ 10 eseményekből (független Bernoulli, csomópontonként), a játékos megfigyelt arányával keverve (súly n/(n+12)). NHL: pont (G+A) 0,5 és 1,5, gólpassz 0,5, kapura lövés; a gólszerző piac is a box score-ok gólarányából számol.</li>
+    <li><strong>Vonal:</strong> az a félvonal, amelynél az „over” esélye a legközelebb van 50%-hoz (mint az irodáknál). A szorzó többnyire becsült – a meccs adatlapján megadhatod a sajátodat.</li>
+    <li><strong>Elszámolás:</strong> a lefújás után letöltött box score-ból. Ha a játékos nem lépett pályára → érvénytelen. Amíg a box score úton van, a tipp és az AI-címke vár; ha nem érkezik meg, érvénytelen.</li>
+    <li><strong>AI:</strong> a játékos-statok és a dupla-/tripla-dupla külön családként tanul (<em>player</em>, <em>playerdd</em>).</li>
   </ul>
   <h3>Élő meccsek</h3>
   <ul>

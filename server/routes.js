@@ -7,6 +7,7 @@ import { localDay, dayOffset } from './lib/time.js';
 import { providerStatuses } from './providers/registry.js';
 import { listModels } from './engine/models/index.js';
 import { buildTickets, dayOptions, pickDay, MARKET_GROUPS, filterByGroups } from './engine/combos.js';
+import { playerDataStatus } from './services/players.js';
 import { runBacktest } from './engine/backtest.js';
 import { mockHistory } from './providers/mock.js';
 import { state, refresh, matchSummary, matchDetail, legCandidates, reanalyse, onUpdate } from './services/ingest.js';
@@ -29,7 +30,7 @@ export function registerRoutes(app) {
   app.get('/api/meta', (req, res) => res.json({
     dataMode: config.dataMode, timezone: config.timezone, leagues: LEAGUES.map(({ id, sport, name, short }) => ({ id, sport, name, short })), sports: SPORTS,
     leagueStatus: state.leagueStatus, lastUpdate: state.lastUpdate, version: state.version,
-    refresh: config.refresh, providers: providerStatuses(), models: listModels(), jobs: jobStatus(),
+    refresh: config.refresh, providers: providerStatuses(), models: listModels(), jobs: jobStatus(), playerData: playerDataStatus(),
   }));
 
   app.get('/api/matches', (req, res) => {

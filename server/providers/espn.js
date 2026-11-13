@@ -39,7 +39,7 @@ export function normaliseTeamEvent(ev, league, now) {
   };
   const h = side(home); const a = side(away);
   const m = {
-    id: `espn-${league.id}-${ev.id}`, provider: 'espn', sport: league.sport, league: league.id, leagueName: league.name,
+    id: `espn-${league.id}-${ev.id}`, eventId: String(ev.id), provider: 'espn', sport: league.sport, league: league.id, leagueName: league.name,
     startTime: new Date(comp.date || ev.date).toISOString(), status: state,
     statusText: state === 'pre' ? 'Közelgő' : state === 'post' ? 'Vége' : (comp.status?.type?.shortDetail || 'Élő'),
     home: h.team, away: a.team,
@@ -131,6 +131,87 @@ export function normaliseTeamEvent(ev, league, now) {
   return m;
 }
 
+
+// ---------------------------------------------------------------------------
+// Injury report (league-wide, one request) and box scores (game summary)
+// ---------------------------------------------------------------------------
+const INJ_TYPE_HU = { knee: 'térd', ankle: 'boka', hamstring: 'combhajlító', foot: 'lábfej', back: 'hát', hip: 'csípő', shoulder: 'váll', groin: 'ágyék', calf: 'vádli',
+  illness: 'betegség', concussion: 'agyrázkódás', wrist: 'csukló', hand: 'kéz', finger: 'ujj', thumb: 'hüvelykujj', achilles: 'Achilles-ín', 'upper body': 'felsőtest', 'lower body': 'alsótest',
+  personal: 'személyes ok', rest: 'pihentetés', elbow: 'könyök', neck: 'nyak', quadriceps: 'combfeszítő', quad: 'combfeszítő', leg: 'láb', toe: 'lábujj', head: 'fej', face: 'arc', eye: 'szem',
+  abdomen: 'has', oblique: 'oldalizom', chest: 'mellkas', ribs: 'bordák', shin: 'sípcsont', heel: 'sarok', 'not injury related': 'nem sérülés', suspension: 'eltiltás', undisclosed: 'nem közölt' };
+const injTypeHu = (t) => { if (!t) return 'sérülés'; const k = String(t).toLowerCase(); return INJ_TYPE_HU[k] || Object.entries(INJ_TYPE_HU).find(([e]) => k.includes(e))?.[1] || t; };
+
+/** ESPN status → { status (HU), playProb }. */
+export function injuryStatus(raw, typeName = '') {
+  const s = `${raw || ''} ${typeName || ''}`.toLowerCase();
+  if (/suspen/.test(s)) return { status: 'eltiltva', playProb: 0 };
+  if (/\bout\b|injured reserve|\bir\b|ltir|long[- ]term|season|inactive|_out/.test(s)) return { status: 'kiesik', playProb: 0 };
+  if (/doubtful/.test(s)) return { status: 'kétséges', playProb: 0.25 };
+  if (/questionable|game[- ]time|gtd/.test(s)) return { status: 'kétséges', playProb: 0.5 };
+  if (/day[- ]to[- ]day|dtd/.test(s)) return { status: 'kétséges', playProb: 0.6 };
+  if (/probable/.test(s)) return { status: 'valószínűleg játszik', playProb: 0.85 };
+  return { status: 'kétséges', playProb: 0.5 };
+}
+
+/** League injuries endpoint → { teams: { [teamName]: [entry] } }. Defensive parsing. */
+export function parseInjuries(json, now = Date.now()) {
+  const teams = {};
+  for (const t of json?.injuries || []) {
+    const team = t.displayName || t.team?.displayName; if (!team) continue;
+    const list = [];
+    for (const it of t.injuries || []) {
+      const name = it.athlete?.displayName || it.athlete?.fullName; if (!name) continue;
+      const { status, playProb } = injuryStatus(it.status || it.details?.fantasyStatus?.description, it.type?.name || it.type?.description);
+      const date = Date.parse(it.date) || null;
+      list.push({
+        name, status, playProb, statusRaw: it.status || null, type: injTypeHu(it.details?.type || it.type?.description),
+        detail: it.details?.detail || null, returnDate: it.details?.returnDate || null, date: date ? new Date(date).toISOString() : null,
+        fresh: date ? now - date < 48 * 3600e3 : false, comment: (it.shortComment || '').slice(0, 300) || null, impact: 0.3,
+      });
+    }
+    teams[team] = list;
+  }
+  return { teams };
+}
+
+const num = (x) => { const v = parseFloat(String(x ?? '').split('-')[0]); return Number.isFinite(v) ? v : null; };
+const minutes = (x) => { if (x == null || x === '' || x === '--') return null; const [m, s] = String(x).split(':'); const v = Number(m) + (Number(s) || 0) / 60; return Number.isFinite(v) ? v : null; };
+
+/** Game summary → compact box score { home:{name, players:{…}}, away:{…} } or null. */
+export function parseBoxscore(json, sport) {
+  const bx = json?.boxscore; if (!bx?.players?.length) return null;
+  const comps = json?.header?.competitions?.[0]?.competitors || [];
+  const sideOfId = {}; for (const c of comps) if (c.team?.id) sideOfId[String(c.team.id)] = c.homeAway;
+  const out = {};
+  bx.players.forEach((tm, idx) => {
+    const side = sideOfId[String(tm.team?.id)] || tm.homeAway || (idx === 0 ? 'away' : 'home');
+    const players = {};
+    for (const grp of tm.statistics || []) {
+      const keys = (grp.keys || grp.names || []).map((k) => String(k).toLowerCase());
+      const labels = (grp.labels || []).map((k) => String(k).toUpperCase());
+      if (keys.some((k) => /saves|goalsagainst/.test(k)) || /goalie/i.test(grp.name || grp.text || '')) continue; // goalies
+      const at = (ks, ls) => { for (const k of ks) { const i = keys.indexOf(k.toLowerCase()); if (i >= 0) return i; } for (const l of ls) { const i = labels.indexOf(l); if (i >= 0) return i; } return -1; };
+      const I = sport === 'nba'
+        ? { min: at(['minutes'], ['MIN']), pts: at(['points'], ['PTS']), reb: at(['rebounds', 'totalRebounds'], ['REB']), ast: at(['assists'], ['AST']),
+          tpm: at(['threePointFieldGoalsMade-threePointFieldGoalsAttempted', 'threePointFieldGoalsMade'], ['3PT', '3PM']), stl: at(['steals'], ['STL']), blk: at(['blocks'], ['BLK']) }
+        : { toi: at(['timeOnIce'], ['TOI']), g: at(['goals'], ['G']), a: at(['assists'], ['A']), sog: at(['shotsTotal', 'shotsOnGoal', 'shots'], ['S', 'SOG']) };
+      if ((sport === 'nba' && I.pts < 0) || (sport === 'nhl' && I.g < 0)) continue;
+      for (const a of grp.athletes || []) {
+        const name = a.athlete?.displayName || a.athlete?.fullName; if (!name) continue;
+        const st = a.stats || [];
+        if (a.didNotPlay || !st.length) { players[name] = { dnp: true }; continue; }
+        const line = {};
+        for (const [k, i] of Object.entries(I)) { if (i < 0) continue; line[k] = k === 'min' || k === 'toi' ? minutes(st[i]) : num(st[i]); }
+        if (sport === 'nba' && !(line.min > 0)) { players[name] = { dnp: true }; continue; }
+        if (a.starter) line.starter = true;
+        players[name] = line;
+      }
+    }
+    if (Object.keys(players).length) out[side] = { name: tm.team?.displayName || tm.team?.name || null, players };
+  });
+  return out.home && out.away ? out : null;
+}
+
 const clockMin = (c) => { const [mm, ss] = String(c || '0:0').split(':').map(Number); return (mm || 0) + (ss || 0) / 60; };
 
 export function normaliseTennis(ev, league, now) {
@@ -171,7 +252,7 @@ export function normaliseTennis(ev, league, now) {
 
 class EspnProvider extends Provider {
   constructor() {
-    super({ id: 'espn', name: 'ESPN (nyilvános JSON)', kinds: ['fixtures', 'standings', 'odds'], homepage: 'https://www.espn.com',
+    super({ id: 'espn', name: 'ESPN (nyilvános JSON)', kinds: ['fixtures', 'standings', 'odds', 'injuries (NBA, NHL)', 'box scores (NBA, NHL)'], homepage: 'https://www.espn.com',
       terms: 'Nem hivatalos, dokumentálatlan végpontok; kizárólag személyes, nem kereskedelmi használatra. Bármikor megváltozhatnak.', freeTier: 'Kulcs nélkül' });
   }
 
@@ -208,6 +289,31 @@ class EspnProvider extends Provider {
     }
     const status = results.some((r) => r.status === 'cached') || lastErr ? 'cached' : 'live';
     return { matches, status, fetchedAt: Math.min(...results.map((r) => r.fetchedAt)) };
+  }
+
+
+  /** League-wide injury report (NBA, NHL). Cached 30 min; parsed compactly. */
+  async injuries(league) {
+    if (!['nba', 'nhl'].includes(league.sport)) return null;
+    const url = `${BASE}/${league.espn}/injuries`;
+    try {
+      const res = await cache.wrap(`espn:inj:${league.id}`, 30 * 60e3, async () => parseInjuries(await getJson('espn', url)));
+      this.ok();
+      return { teams: res.value?.teams || {}, status: res.status, fetchedAt: res.fetchedAt };
+    } catch (err) { this.fail(err); throw err; }
+  }
+
+  /** Box score of one finished game (summary endpoint), parsed. Not cached here (the caller stores it). */
+  async boxscore(league, eventId) {
+    const url = `${BASE}/${league.espn}/summary?event=${encodeURIComponent(eventId)}`;
+    return parseBoxscore(await getJson('espn', url), league.sport);
+  }
+
+  /** Finished event ids of one past day (scoreboard). */
+  async finishedEvents(league, day) {
+    const json = await getJson('espn', `${BASE}/${league.espn}/scoreboard?dates=${day}`);
+    return (json?.events || []).filter((ev) => ev.competitions?.[0]?.status?.type?.state === 'post' || ev.status?.type?.state === 'post')
+      .map((ev) => ({ id: String(ev.id), t: Date.parse(ev.date) || null }));
   }
 
   async standings(league) {

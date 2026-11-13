@@ -103,6 +103,7 @@ input:user-invalid { border-color: var(--neg); }
 .b-mock { color: var(--mock); background: var(--mock-bg); }
 .b-est { color: var(--muted); background: var(--surface-2); border-color: var(--line); }
 .b-manual { color: var(--info); background: var(--info-bg); }
+.b-out { color: var(--neg); background: var(--neg-bg); }
 .b-na { color: var(--muted); background: transparent; border-color: var(--line); }
 .status { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-s); white-space: nowrap; }
 .st-live { background: #c4262e; color: #fff; }
@@ -352,6 +353,15 @@ details.more-markets { margin-top: 12px; }
 details.more-markets > summary { cursor: pointer; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); font-weight: 600; list-style-position: inside; }
 details.more-markets[open] > summary { border-radius: var(--radius-m) var(--radius-m) 0 0; border-bottom: 0; }
 details.more-markets[open] > .tbl-wrap { border-radius: 0 0 var(--radius-m) var(--radius-m); }
+details.player-markets[open] { border: 1px solid var(--line); border-radius: var(--radius-m); padding: 0 14px 14px; background: var(--surface); }
+details.player-markets[open] > summary { margin: 0 -14px 10px; border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--line); }
+.pl-card { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pl-card .pl-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 2px; }
+.pl-card .tbl-wrap { margin-top: 6px; }
+.pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 0 18px; }
+.prop-tbl td, .prop-tbl th { padding: 6px 8px; }
+.odds-input.odds-mini { width: 70px; margin-top: 3px; padding: 2px 6px; font-size: .8rem; }
+@media (max-width: 640px) { .pl-grid { grid-template-columns: 1fr; } }
 
 @media (max-width: 860px) {
   .mobilebar { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: 0; z-index: 30;

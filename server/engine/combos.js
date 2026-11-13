@@ -35,7 +35,7 @@ export const MODES = {
 
 // Market families. Same match + same family = conflict.
 // result/spread/sets all describe who wins, so they conflict with each other.
-const FAMILY_GROUP = { result: 'winner', spread: 'winner', sets: 'winner', totals: 'totals', teamtotals: 'totals', btts: 'btts', scorer: 'scorer', player: 'player', cards: 'cards' };
+const FAMILY_GROUP = { result: 'winner', spread: 'winner', sets: 'winner', totals: 'totals', teamtotals: 'totals', btts: 'btts', scorer: 'scorer', player: 'player', playerdd: 'player', cards: 'cards' };
 // Correlation magnitude for allowed same-match pairs (symmetric).
 const RHO = { 'winner|totals': 0.15, 'winner|btts': 0.12, 'totals|btts': 0.45, 'winner|scorer': 0.2, 'totals|scorer': 0.3, 'btts|scorer': 0.25,
   'winner|player': 0.15, 'totals|player': 0.3, 'winner|cards': 0.05, 'totals|cards': 0.05, 'btts|cards': 0.05, 'scorer|cards': 0.03, 'player|cards': 0.03, 'scorer|player': 0.2 };
@@ -47,7 +47,8 @@ export const MARKET_GROUPS = {
   spread: { label: 'Hendikep', families: ['spread'] },
   totals: { label: 'Gól/pont over-under', families: ['totals', 'teamtotals'] },
   btts: { label: 'Mindkét csapat gól', families: ['btts'] },
-  scorer: { label: 'Gólszerző / játékos', families: ['scorer', 'player'] },
+  scorer: { label: 'Gólszerző', families: ['scorer'] },
+  player: { label: 'Játékos-statok (PRA, DD…)', families: ['player', 'playerdd'] },
   cards: { label: 'Sárga lapok', families: ['cards'] },
 };
 export function filterByGroups(legs, groups) {

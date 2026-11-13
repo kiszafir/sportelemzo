@@ -50,6 +50,15 @@ try {
   void fam;
   const sc = await get('/api/combos/brutal?markets=scorer,cards');
   check('Mix a gólszerző + sárga lap piacokból', sc.tickets.length >= 1 && sc.tickets.every((t) => t.legs.every((l) => ['scorer', 'player', 'cards'].includes(l.family))), sc.tickets.map((t) => t.odds).join(', '));
+  const nbaPre = ms.matches.find((m) => m.sport === 'nba' && m.status === 'pre');
+  const nb = await get('/api/matches/' + encodeURIComponent(nbaPre.id));
+  const ppStats = new Set(nb.analysis.markets.filter((m) => m.key.startsWith('pp:')).map((m) => m.stat));
+  check('NBA játékospiacok (pont, lepattanó, assziszt, 3P, PR, PRA, RA, dupla-dupla)', ['pts', 'reb', 'ast', '3pm', 'pr', 'pra', 'ra', 'dd'].every((x) => ppStats.has(x)) && Array.isArray(nb.match.stats.home.injuries), `${nb.analysis.markets.filter((m) => m.key.startsWith('pp:')).length} játékospiac`);
+  const nhPre = ms.matches.find((m) => m.sport === 'nhl' && m.status === 'pre');
+  const nh = await get('/api/matches/' + encodeURIComponent(nhPre.id));
+  check('NHL játékospiacok (pont, gólpassz, lövés)', ['p', 'a', 'sog'].every((x) => nh.analysis.markets.some((m) => m.stat === x)));
+  const pm = await get('/api/combos/brutal?markets=player');
+  check('Mix a játékos-statokból', pm.tickets.length >= 1 && pm.tickets.every((t) => t.legs.every((l) => ['player', 'playerdd'].includes(l.family))), pm.tickets.map((t) => t.odds).join(', '));
   const ai = await get('/api/ai');
   const aiModels = Object.values(ai.models.mock || {}).flatMap((f) => Object.values(f));
   check('AI-motor tanult (mintaadaton)', ai.trainedAt && aiModels.some((m) => m.active) && ai.insights.length > 0, `${aiModels.filter((m) => m.active).length} aktív korrekció, ${ai.insights.length} megfigyelés`);

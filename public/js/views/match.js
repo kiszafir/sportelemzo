@@ -31,6 +31,7 @@ export async function render(el, { id }, { live, toast }) {
       ${scoreboard(m)}
       ${t ? tipCard(t, a) : `<div class="notice">${m.status === 'post' ? 'A meccs véget ért; ajánlás nem készül, az eredmény a tippnaplóban szerepel.' : 'Ehhez a meccshez nincs ajánlás.'}</div>`}
       ${m.live ? livePanel(m) : ''}
+      ${injuryPanel(m)}
       <h2 style="margin:22px 0 10px">Piacok: modell kontra piac</h2>
       <p class="muted small">A legjobb elérhető szorzó kiemelve. Ha nincs piaci szorzó, add meg a sajátodat – az érték azonnal újraszámolódik. Árrés nélküli valószínűség: Shin-módszer.</p>
       ${marketsTable(a, d.manualOdds)}
@@ -86,9 +87,72 @@ export async function render(el, { id }, { live, toast }) {
       <div class="live-grid">${cells.join('') || '<span class="muted">A szolgáltató nem ad élő részstatisztikát.</span>'}</div></section>`;
   }
 
+  function injuryPanel(m) {
+    if (!['nba', 'nhl'].includes(m.sport)) return '';
+    const inj = { home: m.stats?.home?.injuries, away: m.stats?.away?.injuries };
+    if (!Array.isArray(inj.home) && !Array.isArray(inj.away)) return '';
+    const src = m.meta?.injuries;
+    const pill = (i) => `<span class="badge ${i.playProb === 0 || i.status === 'kiesik' || i.status === 'eltiltva' ? 'b-out' : i.playProb >= 0.8 ? 'b-live' : 'b-cached'}">${esc(i.status)}</span>`;
+    const row = (i) => {
+      const isNew = i.date && Date.now() - Date.parse(i.date) < 48 * 3600e3;
+      return `<li style="margin:6px 0">${pill(i)} <strong>${esc(i.name)}</strong> <span class="muted small">${esc(i.type || '')}${i.detail ? ' – ' + esc(i.detail) : ''}${i.date ? ' · jelentve ' + esc(ago(Date.parse(i.date))) : ''}${i.returnDate ? ' · várható visszatérés ' + esc(date(i.returnDate)) : ''}</span>
+        ${isNew ? '<span class="badge b-manual" title="Az elmúlt 48 órában jelentett">ÚJ</span>' : ''}${i.freshAbsence ? ' <span class="badge b-cached" title="A legutóbbi meccseken még játszott – a hiánya még nincs benne az átlagokban">FRISS HIÁNYZÓ</span>' : ''}
+        ${i.comment ? `<div class="small muted" lang="en">${esc(i.comment)}</div>` : ''}</li>`;
+    };
+    const col = (side) => `<div><h3 style="margin:0 0 6px;font-size:1rem">${esc(m[side].name)}</h3>${(inj[side] || []).length ? `<ul style="list-style:none;margin:0;padding:0">${inj[side].map(row).join('')}</ul>` : '<p class="muted small" style="margin:0">Nincs jelentett hiányzó.</p>'}</div>`;
+    return `<section class="card" style="margin-top:16px" aria-label="Hiányzók és sérültek"><div class="panel-title"><h2>Hiányzók, sérültek</h2>${src ? `<span>${badge(src.status, src.fetchedAt)} <span class="muted small">${esc(src.src || '')}${src.fetchedAt ? ' · ' + ago(src.fetchedAt) : ''}</span></span>` : ''}</div>
+      <div class="grid-2">${col('home')}${col('away')}</div>
+      <p class="small muted" style="margin-top:8px">A „kiesik” játékosok nem kapnak játékospiacot; a szerepüket (perc, dobások, labdabirtoklás) a modell a csapattársak között osztja szét. „Kétséges” játékos piaca megmarad – ha nem lép pályára, a fogadás érvénytelen.</p></section>`;
+  }
+
+  function propTable(mks, manual, caption, name) {
+    const cell = (mk, s) => {
+      if (!s) return '<td></td>';
+      const mkey = `${mk.key}:${s.key}`;
+      const best = s.market?.best;
+      return `<td class="r" data-label="${esc(s.label)}"><div class="num"><strong>${pct(s.p, 0)}</strong> · ${best ? `<span class="best">${odds(best)}</span>` : `${odds(s.odds)} ${s.oddsSource === 'estimated' ? '<span class="muted small" title="Becsült szorzó">becs.</span>' : s.oddsSource === 'manual' ? badge('manual') : ''}`}</div>
+        <div class="small ${evClass(s.ev)}">${s.oddsSource === 'estimated' ? `méltányos ${odds(s.fair)}` : `EV ${signedPct(s.ev)}`}</div>
+        <label class="sr-only" for="o-${esc(mkey)}">Saját szorzó: ${esc(s.name)}</label><input class="odds-input odds-mini" id="o-${esc(mkey)}" data-odds-key="${esc(mkey)}" data-market="${esc(mk.key)}" data-sel="${esc(s.key)}" type="text" inputmode="decimal" placeholder="saját" value="${manual[mkey] ? String(manual[mkey]).replace('.', ',') : ''}"></td>`;
+    };
+    const rows = mks.map((mk) => {
+      const [o, u] = mk.selections;
+      return `<tr><td class="full">${esc(mk.label.replace(`${name} – `, ''))}${mk.projection != null ? `<div class="small muted">várható ${num(mk.projection, mk.stat === 'g' || mk.stat === 'a' || mk.stat === 'p' ? 2 : 1)}</div>` : ''}</td>${cell(mk, o)}${cell(mk, u)}</tr>`;
+    }).join('');
+    return `<div class="tbl-wrap"><table class="tbl stack prop-tbl"><caption class="sr-only">${esc(caption)}</caption><thead><tr><th scope="col">Piac (vonal)</th><th scope="col" class="r">Több / Igen</th><th scope="col" class="r">Kevesebb / Nem</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
+  function playerSection(a, m, manual) {
+    const pm = a.markets.filter((mk) => mk.player && mk.key.startsWith('pp:'));
+    if (!pm.length) return '';
+    const info = a.players || {};
+    const f1 = (x) => num(x, 1);
+    const teams = ['home', 'away'].map((side) => {
+      const mine = pm.filter((mk) => mk.playerSide === side); if (!mine.length) return '';
+      const names = [...new Set([...(info[side]?.players || []).map((p) => p.name), ...mine.map((mk) => mk.player)])];
+      const cards = names.map((name) => {
+        const mks = mine.filter((mk) => mk.player === name); if (!mks.length) return '';
+        const p = (info[side]?.players || []).find((x) => x.name === name);
+        const pr = p?.proj || {}; const av = p?.avg || {};
+        const projTxt = m.sport === 'nba'
+          ? `Várható: ${f1(pr.min)} perc · ${f1(pr.pts)} pont · ${f1(pr.reb)} lep. · ${f1(pr.ast)} gp.`
+          : `Várható: ${f1(pr.toi)} perc · ${num(pr.g, 2)} gól · ${num(pr.a, 2)} gp. · ${f1(pr.sog)} lövés`;
+        const avgTxt = m.sport === 'nba' ? `átlag ${f1(av.pts)}/${f1(av.reb)}/${f1(av.ast)} (${p?.gp ?? '?'} meccs)` : `átlag ${num(av.g, 2)} G / ${num(av.a, 2)} A (${p?.gp ?? '?'} meccs)`;
+        const inj = p?.injury ? ` <span class="badge b-cached">${esc(p.injury.status)}${p.injury.type ? ' – ' + esc(p.injury.type) : ''}</span>` : '';
+        return `<div class="pl-card"><div class="pl-head"><strong>${esc(name)}</strong>${inj}</div>
+          ${p ? `<div class="small muted">${projTxt} · ${avgTxt}${p.recent?.length && p.recent[0] ? ` · utolsó: ${esc(p.recent.slice(0, 3).join(', '))}` : ''}</div>` : ''}
+          ${propTable(mks, manual, `${name} játékospiacai`, name)}</div>`;
+      }).join('');
+      const out = info[side]?.out || [];
+      return `<h3 style="margin:16px 0 4px">${esc(m[side].name)}</h3>${out.length ? `<p class="small muted" style="margin:0 0 6px">Nem játszik: ${out.map((o) => `${esc(o.name)}${o.type ? ' (' + esc(o.type) + ')' : ''}`).join(', ')}</p>` : ''}<div class="pl-grid">${cards}</div>`;
+    }).join('');
+    const opened = sessionStorage.getItem('playerMarkets') === '1';
+    return `<details class="more-markets player-markets" ${opened ? 'open' : ''}><summary>Játékospiacok (${pm.length}): ${m.sport === 'nba' ? 'pont, lepattanó, gólpassz, hárompontos, PR, PRA, RA, dupla-dupla, tripla-dupla' : 'pont (gól+gólpassz), gólpassz, kapura lövés'}</summary>
+      <p class="small muted">Box score-okból számolt játékosprofilok (a frissebb meccs nagyobb súllyal), a friss sérüléslistával és a meccs várható tempójával korrigálva. Cellánként: modell-valószínűség · szorzó; a szorzók többnyire becsültek („becs.”) – írd be a fogadóirodád szorzóját, és az érték azonnal újraszámolódik.</p>${teams}</details>`;
+  }
+
   function marketsTable(a, manual) {
-    const block = (mks) => mks.map((mk) => {
-      const head = `<tr class="mk-head"><td colspan="9">${esc(mk.label)}${mk.overround != null ? ` <span class="muted small">· árrés ${pct(mk.overround)}</span>` : ''}</td></tr>`;
+    const block = (mks, labelOf = (mk) => mk.label) => mks.map((mk) => {
+      const head = `<tr class="mk-head"><td colspan="9">${esc(labelOf(mk))}${mk.overround != null ? ` <span class="muted small">· árrés ${pct(mk.overround)}</span>` : ''}</td></tr>`;
       return head + mk.selections.map((s) => {
         const quotes = s.market?.quotes || [];
         const best = s.market?.best;
@@ -107,13 +171,15 @@ export async function render(el, { id }, { live, toast }) {
         </tr>`;
       }).join('');
     }).join('');
-    const table = (mks, caption) => `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">${caption}</caption><thead><tr>
+    const table = (mks, caption, labelOf) => `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">${esc(caption)}</caption><thead><tr>
       <th scope="col">Kimenetel</th><th scope="col" class="r">Modell</th><th scope="col" class="r">Méltányos</th><th scope="col" class="r">Legjobb piaci</th>
       <th scope="col" class="r">Piac árrés nélkül</th><th scope="col" class="r" title="Modell − piac (árrés nélkül)">Előny</th><th scope="col" class="r">EV</th><th scope="col" class="r" title="Teljes Kelly-hányad">Kelly</th><th scope="col" class="r">Saját szorzó</th>
-    </tr></thead><tbody>${block(mks)}</tbody></table></div>`;
-    const main = a.markets.filter((mk) => !mk.alt); const extra = a.markets.filter((mk) => mk.alt);
+    </tr></thead><tbody>${block(mks, labelOf)}</tbody></table></div>`;
+    const isProp = (mk) => mk.player && mk.key.startsWith('pp:');
+    const main = a.markets.filter((mk) => !mk.alt); const extra = a.markets.filter((mk) => mk.alt && !isProp(mk));
     const opened = sessionStorage.getItem('moreMarkets') === '1';
-    return table(main, 'Fő piacok') + (extra.length ? `<details class="more-markets" ${opened ? 'open' : ''}><summary>További piacok (${extra.length}): ${esc([...new Set(extra.map((mk) => mk.betType))].slice(0, 6).join(', '))}</summary>${table(extra, 'További piacok')}</details>` : '');
+    return table(main, 'Fő piacok') + (extra.length ? `<details class="more-markets" ${opened ? 'open' : ''}><summary>További piacok (${extra.length}): ${esc([...new Set(extra.map((mk) => mk.betType))].slice(0, 6).join(', '))}</summary>${table(extra, 'További piacok')}</details>` : '')
+      + playerSection({ ...a, markets: a.markets.filter(isProp) }, d.match, manual);
   }
 
 
@@ -169,7 +235,10 @@ export async function render(el, { id }, { live, toast }) {
     return `<div class="tbl-wrap"><table class="tbl stack"><caption class="sr-only">Tényezők</caption><thead><tr><th scope="col">Tényező</th><th scope="col" class="r">${m.sport === 'tennis' ? '1. játékos' : 'Hazai'}</th><th scope="col" class="r">${m.sport === 'tennis' ? '2. játékos' : 'Vendég'}</th><th scope="col" class="r">Súly</th><th scope="col">Hatás</th><th scope="col">Forrás, frissesség</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
-  el.addEventListener('toggle', (e) => { if (e.target.classList?.contains('more-markets')) sessionStorage.setItem('moreMarkets', e.target.open ? '1' : '0'); }, true);
+  el.addEventListener('toggle', (e) => {
+    if (e.target.classList?.contains('player-markets')) sessionStorage.setItem('playerMarkets', e.target.open ? '1' : '0');
+    else if (e.target.classList?.contains('more-markets')) sessionStorage.setItem('moreMarkets', e.target.open ? '1' : '0');
+  }, true);
   el.addEventListener('change', async (e) => {
     const inp = e.target.closest('.odds-input'); if (!inp) return;
     const raw = inp.value.trim().replace(',', '.');

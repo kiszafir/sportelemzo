@@ -10,14 +10,14 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { db, store } from '../store.js';
 import { createLogger } from '../logger.js';
-import { settleSelection } from '../engine/settle.js';
+import { settleSelection, awaitingBox } from '../engine/settle.js';
 import { trainCalibrator, trainFactors, adjustMarket, interpret, MIN_ROWS } from '../engine/ai.js';
 
 const log = createLogger('ai');
 const FILE = path.join(config.dataDir, 'ai.json');
-const FAMILIES = ['result', 'totals', 'spread', 'btts', 'teamtotals', 'cards', 'player'];
+const FAMILIES = ['result', 'totals', 'spread', 'btts', 'teamtotals', 'cards', 'player', 'playerdd'];
 const SPORT_HU = { nba: 'NBA', nhl: 'NHL', tennis: 'Tenisz', football: 'Labdarúgás', handball: 'Kézilabda' };
-const FAMILY_HU = { result: 'győztes / végeredmény', totals: 'gólszám / összpontszám', spread: 'hendikep', btts: 'mindkét csapat gól', teamtotals: 'csapat gól-/pontszáma', cards: 'sárga lapok', player: 'játékos pontjai / góljai' };
+const FAMILY_HU = { result: 'győztes / végeredmény', totals: 'gólszám / összpontszám', spread: 'hendikep', btts: 'mindkét csapat gól', teamtotals: 'csapat gól-/pontszáma', cards: 'sárga lapok', player: 'játékos-statok (pont, lepattanó, gólpassz, lövés)', playerdd: 'dupla-dupla / tripla-dupla' };
 const MAX_RECORDS = 8000;
 
 let ai = { models: {}, factors: {}, insights: [], trainedAt: null, history: [], labels: {}, newSinceTrain: 0 };
@@ -33,9 +33,15 @@ export const srcOf = (match) => (match.provider === 'mock' ? 'mock' : 'live');
 /** Store/refresh the pre-match snapshot of a match (raw probabilities, before AI). */
 export function recordSnapshot(match, analysis, { save = true } = {}) {
   if (!analysis || match.status !== 'pre') return;
-  const mk = [];
+  const mk = []; let nPlayer = 0;
   for (const m of analysis.markets) {
     if (!FAMILIES.includes(m.family) || m.key === 'dc') continue;
+    // Player props: the core lines only (points/rebounds/assists/PRA, NHL points/shots), at most 24 per match,
+    // so db.json does not balloon with ~100 prop markets per NBA game.
+    if ((m.family === 'player' || m.family === 'playerdd') && m.key.startsWith('pp:')) {
+      const st = m.key.split(':')[3];
+      if (!['pts', 'reb', 'ast', 'pra', 'p', 'sog', '3pm', 'dd'].includes(st) || ++nPlayer > 28) continue;
+    }
     mk.push({ k: m.key, f: m.family, line: m.line ?? null, s: m.selections.map((s) => [s.key, s.pRaw ?? s.p, s.novig ?? null]) });
   }
   const x = {};
@@ -49,6 +55,8 @@ export function labelRecord(match) {
   const r = records()[match.id];
   if (!r || r.y || match.status !== 'post') return false;
   if (match.void) { delete records()[match.id]; return false; }
+  // Player markets settle from the box score: wait while it is still being fetched.
+  if (awaitingBox(match) && r.mk.some((m) => m.k.startsWith('pp:') || m.k.startsWith('pl:'))) return false;
   const y = {};
   for (const m of r.mk) {
     y[m.k] = {};

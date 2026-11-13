@@ -110,7 +110,13 @@ export function archiveFinished(matches) {
   if (!fin.length) return;
   if (!archived) { try { archived = fs.existsSync(HIST_FILE) ? JSON.parse(fs.readFileSync(HIST_FILE, 'utf8')) : []; } catch { archived = []; } }
   const ids = new Set(archived.map((m) => m.id)); let n = 0;
-  for (const m of fin) if (!ids.has(m.id)) { const { odds: _o, ...rest } = m; void _o; archived.push(rest); n++; }
+  for (const m of fin) {
+    if (ids.has(m.id)) continue;
+    const { odds: _o, ...rest } = m; void _o;
+    // player profiles are rebuilt from box scores; keep the archive small
+    if (rest.stats) rest.stats = Object.fromEntries(Object.entries(rest.stats).map(([k, v]) => { if (!v || typeof v !== 'object') return [k, v]; const { roster: _r, teamAvg: _t, ...st } = v; void _r; void _t; return [k, st]; }));
+    archived.push(rest); n++;
+  }
   if (n) {
     if (archived.length > 5000) archived = archived.slice(-5000);
     try { fs.writeFileSync(HIST_FILE, JSON.stringify(archived)); } catch (err) { log.warn('archive write failed', { err }); }

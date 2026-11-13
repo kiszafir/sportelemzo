@@ -5,7 +5,7 @@ import { ICON } from '../icons.js';
 import { esc, pct, num, timeS, date, SPORT_HU, ago } from '../format.js';
 import { lineChart, barChart } from '../charts.js';
 
-const FAMILY_HU = { result: 'Győztes / végeredmény', totals: 'Gólszám / összpontszám', spread: 'Hendikep', btts: 'Mindkét csapat gól', teamtotals: 'Csapat gól-/pontszáma', cards: 'Sárga lapok', player: 'Játékos pontjai / góljai' };
+const FAMILY_HU = { result: 'Győztes / végeredmény', totals: 'Gólszám / összpontszám', spread: 'Hendikep', btts: 'Mindkét csapat gól', teamtotals: 'Csapat gól-/pontszáma', cards: 'Sárga lapok', player: 'Játékos-statok (pont, lepattanó, gólpassz, lövés)', playerdd: 'Dupla-dupla / tripla-dupla' };
 const SRC_HU = { live: 'Élő adatok', mock: 'Mintaadat' };
 
 export async function render(el, _a, { toast }) {

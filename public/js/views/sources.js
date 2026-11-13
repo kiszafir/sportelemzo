@@ -21,7 +21,8 @@ export async function render(el) {
       <section class="card" style="margin-top:16px"><h2 style="margin-bottom:10px">Bajnokságok adatállapota</h2>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th scope="col">Bajnokság</th><th scope="col">Sportág</th><th scope="col">Forrás</th><th scope="col" class="r">Meccsek</th><th scope="col">Lekérve</th><th scope="col">Megjegyzés</th></tr></thead><tbody>
       ${meta.leagues.map((l) => { const s = meta.leagueStatus[l.id] || {}; return `<tr><td>${esc(l.name)}</td><td>${SPORT_HU[l.sport]}</td><td>${badge(s.source, s.fetchedAt)}</td><td class="r num">${s.count ?? '–'}</td><td>${s.fetchedAt ? timeS(s.fetchedAt) : '–'}</td><td class="small muted">${s.fallback ? 'Az élő forrás nem érhető el – mintaadat. ' : ''}${esc(s.error || '')}</td></tr>`; }).join('')}
-      </tbody></table></div></section>
+      </tbody></table></div>
+      ${Object.keys(meta.playerData || {}).length ? `<p class="small muted" style="margin-top:8px">Játékosadatok (NBA/NHL játékospiacok): ${Object.entries(meta.playerData).map(([id, p]) => `${esc(id.toUpperCase())}: ${p.boxScores} box score${p.lastSync ? ', szinkron ' + timeS(p.lastSync) : ''}`).join(' · ')}. A sérüléslistát az ESPN 30 percenként frissített jelentéséből vesszük.</p>` : ''}</section>
 
       <div class="grid-2" style="margin-top:16px">
         <section class="card"><h2 style="margin-bottom:10px">Ütemezett feladatok</h2>

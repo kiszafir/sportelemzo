@@ -64,11 +64,116 @@ export function squad(sport, league, team) {
   const uniqueName = () => { let n; do { n = fakePerson(r); } while (used.has(n)); used.add(n); return n; };
   const mk = (base) => base.map((b) => ({ name: uniqueName(), share: b * (0.8 + 0.4 * r()), starter: 0.8 + 0.2 * r() }));
   if (sport === 'football') return mk([0.3, 0.17, 0.11, 0.07]);
-  if (sport === 'nhl') return mk([0.15, 0.12, 0.1]);
+  if (sport === 'nhl') {
+    // goal shares of the fictional roster (every goal gets a scorer)
+    const ro = mockRoster('nhl', league, team); const tot = ro.reduce((a, p) => a + p.g, 0);
+    return ro.map((p) => ({ name: p.name, share: p.g / tot, starter: 1 })).sort((a, b) => b.share - a.share);
+  }
   if (sport === 'nba') return [{ name: uniqueName(), ppg: 20 + 11 * r(), starter: 0.92 }];
   if (sport === 'handball') return [6.0, 4.5].map((g) => ({ name: uniqueName(), gpg: g * (0.85 + 0.3 * r()), starter: 0.95 }));
   return [];
 }
+
+// ---------------------------------------------------------------------------
+// Fictional NBA / NHL rosters with per-game profiles (player props), daily
+// injury reports drawn from the roster, and simulated box scores.
+// ---------------------------------------------------------------------------
+const NBA_MIN = [35, 33, 31, 29, 27, 23, 20, 17, 13, 10];
+const NBA_POS = ['G', 'W', 'W', 'B', 'G', 'G', 'W', 'B', 'W', 'B'];
+const NHL_F = [[20, 0.46], [19, 0.39], [18, 0.33], [17, 0.27], [16, 0.22], [15, 0.17], [14, 0.13], [13, 0.1], [12, 0.07]];
+const NHL_D = [[24, 0.1], [22, 0.08], [20, 0.06], [18, 0.04]];
+const rosterCache = new Map();
+export function mockRoster(sport, league, team) {
+  const key = `${sport}:${league}:${team}`;
+  if (rosterCache.has(key)) return rosterCache.get(key);
+  const r = rng(`roster:${key}`); const tr = trueRating(league, team);
+  const used = new Set(); const uniq = () => { let n; do { n = fakePerson(r); } while (used.has(n)); used.add(n); return n; };
+  const v = () => 0.8 + 0.4 * r();
+  let out = [];
+  if (sport === 'nba') {
+    out = NBA_MIN.map((min, i) => {
+      const pos = NBA_POS[i];
+      const ppm = (i < 2 ? 0.68 : i < 5 ? 0.52 : 0.4) * v() * (1 + 0.04 * tr);
+      const rpm = { B: 0.3, W: 0.17, G: 0.12 }[pos] * v(); const apm = { G: 0.2, W: 0.09, B: 0.07 }[pos] * v();
+      const tpmR = { G: 0.07, W: 0.075, B: 0.018 }[pos] * v(); const blkR = pos === 'B' ? 0.045 * v() : 0.012 * v();
+      return { name: uniq(), pos, gp: 12, fresh: 1, min, pts: ppm * min, reb: rpm * min, ast: apm * min, tpm: tpmR * min, stl: 0.032 * v() * min, blk: blkR * min };
+    });
+  } else if (sport === 'nhl') {
+    const sk = (toi, g, d) => { const gg = g * v() * (1 + 0.06 * tr); const a = (d ? 0.35 * v() : gg * 1.25 * v()); return { name: uniq(), pos: d ? 'D' : 'F', gp: 12, fresh: 1, toi, g: gg, a, sog: d ? 1.6 * v() : Math.max(0.8, gg / 0.125) }; };
+    out = [...NHL_F.map(([t, g]) => sk(t, g, false)), ...NHL_D.map(([t, g]) => sk(t, g, true))];
+  }
+  rosterCache.set(key, out);
+  return out;
+}
+
+/** Daily fictional injury report for an NBA/NHL team, drawn from its roster. */
+export function mockTeamInjuries(sport, league, team, t) {
+  const ro = mockRoster(sport, league, team); if (!ro.length) return [];
+  const day = Math.floor(t / (24 * HOUR));
+  const r = rng(`inj:${league}:${team}:${day}`);
+  const n = Math.floor(r() * 3 * r());
+  const picked = new Set(); const list = [];
+  const prod = (p) => (sport === 'nba' ? p.pts + 0.5 * p.reb + 0.7 * p.ast : p.g + 0.7 * p.a);
+  const teamProd = ro.reduce((s, p) => s + prod(p), 0);
+  for (let k = 0; k < n; k++) {
+    const i = Math.floor(r() * ro.length); if (picked.has(i)) continue; picked.add(i);
+    const u = r(); const [status, playProb] = u < 0.55 ? ['kiesik', 0] : u < 0.9 ? ['kétséges', 0.5] : ['valószínűleg játszik', 0.85];
+    list.push({ name: ro[i].name, type: INJURY_TYPES[Math.floor(r() * INJURY_TYPES.length)], status, playProb,
+      impact: Math.round(Math.min(1, Math.max(0.05, prod(ro[i]) / teamProd * (sport === 'nba' ? 2.2 : 3))) * 100) / 100,
+      date: new Date(Math.min(t, day * 24 * HOUR + 2 * HOUR)).toISOString(), fresh: true, freshAbsence: true });
+  }
+  return list;
+}
+
+const nbSample = (mean, r, disp) => Math.max(0, Math.round(gaussSample(r, mean, Math.sqrt(mean + mean * mean / disp))));
+
+/** Simulated NBA box score consistent with the final score; injured players DNP. */
+function nbaBox(league, team, inj, pts, r) {
+  const ro = mockRoster('nba', league, team);
+  const players = {}; const act = [];
+  for (const p of ro) {
+    const i = inj.find((x) => x.name === p.name);
+    if (i && r() >= i.playProb) { players[p.name] = { dnp: true }; continue; }
+    act.push(p);
+  }
+  const F = act.map(() => Math.exp(gaussSample(r, 0, 0.17)));
+  const minSum = act.reduce((s, p, k) => s + p.min * F[k], 0) || 1;
+  const lines = act.map((p, k) => {
+    const min = Math.min(46, (p.min * F[k] * 240) / minSum); const f = min / p.min;
+    return { name: p.name, min: Math.round(min), pts: nbSample(p.pts * f, r, 30), reb: nbSample(p.reb * f, r, 14), ast: nbSample(p.ast * f, r, 10),
+      tpm: nbSample(p.tpm * f, r, 9), stl: nbSample(p.stl * f, r, 40), blk: nbSample(p.blk * f, r, 18) };
+  });
+  const sum = lines.reduce((s, l) => s + l.pts, 0) || 1;
+  for (const l of lines) { l.pts = Math.round(l.pts * pts / sum); l.tpm = Math.min(l.tpm, Math.floor(l.pts / 3)); const { name, ...rest } = l; players[name] = rest; }
+  return { name: team, players };
+}
+
+/** Simulated NHL box score: goals from the simulated scorers, assists and shots sampled. */
+function nhlBox(league, team, inj, goals, shotsRate, r) {
+  const ro = mockRoster('nhl', league, team);
+  const out = new Set(inj.filter((x) => x.playProb === 0).map((x) => x.name));
+  const players = {}; const act = ro.filter((p) => !out.has(p.name));
+  for (const p of ro) if (out.has(p.name)) players[p.name] = { dnp: true };
+  const line = Object.fromEntries(act.map((p) => [p.name, { toi: Math.round(p.toi * (0.85 + 0.3 * r()) * 10) / 10, g: 0, a: 0, sog: 0 }]));
+  const totA = act.reduce((s, p) => s + p.a, 0) || 1;
+  for (const g of goals) {
+    const scorer = g.player && line[g.player] ? g.player : act[Math.floor(r() * act.length)]?.name; if (!scorer) continue;
+    line[scorer].g++;
+    const nA = r() < 0.62 ? 2 : r() < 0.8 ? 1 : 0; const used = new Set([scorer]);
+    for (let k = 0; k < nA; k++) {
+      let u = r() * totA;
+      for (const p of act) { u -= p.a; if (u < 0) { if (!used.has(p.name)) { line[p.name].a++; used.add(p.name); } break; } }
+    }
+  }
+  for (const p of act) { const l = line[p.name]; l.sog = Math.max(l.g, nbSample(p.sog * shotsRate / 30, r, 12)); players[p.name] = l; }
+  return { name: team, players };
+}
+
+function rosterAvg(ro, sport) {
+  const K = sport === 'nba' ? ['min', 'pts', 'reb', 'ast', 'tpm', 'stl', 'blk'] : ['toi', 'g', 'a', 'sog'];
+  return Object.fromEntries(K.map((k) => [k, ro.reduce((s, p) => s + p[k] * p.fresh, 0)]));
+}
+
 const yellowRate = (league, team) => (YELLOW_BASE[league] ?? 2.0) * (0.75 + 0.55 * rng(`yc:${league}:${team}`)());
 
 function formFrom(r, pWin, pDraw = 0, n = 10) {
@@ -169,7 +274,7 @@ function assignScorers(goals, homeSquad, awaySquad, r) {
   }
 }
 
-function simulate(sport, league, home, away, seed) {
+function simulate(sport, league, home, away, seed, inj = { home: [], away: [] }) {
   const r = rng(`sim:${seed}`);
   const d = trueRating(league, home) - trueRating(league, away);
   if (sport === 'football') {
@@ -190,9 +295,10 @@ function simulate(sport, league, home, away, seed) {
     const total = Math.round(226 + gaussSample(r, 0, 17));
     const H = Math.round((total + margin) / 2); const A = total - H;
     const split = (pts) => { const w = Array.from({ length: 48 }, () => 0.6 + r()); const s = w.reduce((a, b) => a + b, 0); let acc = 0; return w.map((x) => { acc += (x / s) * pts; return Math.round(acc); }); };
-    const pp = {};
-    for (const [side, team] of [['home', home], ['away', away]]) for (const pl of squad('nba', league, team)) pp[pl.name] = r() < pl.starter ? Math.max(0, Math.round(gaussSample(r, pl.ppg, 0.27 * pl.ppg))) : 0;
-    return { final: { home: H, away: A }, cumHome: split(H), cumAway: split(A), ot, playerPoints: pp };
+    const br = rng(`box:${seed}`);
+    const box = { home: nbaBox(league, home, inj.home, H, br), away: nbaBox(league, away, inj.away, A, br) };
+    const pp = {}; for (const sd of ['home', 'away']) for (const [n, l] of Object.entries(box[sd].players)) if (!l.dnp) pp[n] = l.pts;
+    return { final: { home: H, away: A }, cumHome: split(H), cumAway: split(A), ot, playerPoints: pp, box };
   }
   if (sport === 'handball') {
     const women = /w$/.test(league);
@@ -213,8 +319,13 @@ function simulate(sport, league, home, away, seed) {
     goals.sort((a, b) => a.minute - b.minute);
     let ot = null;
     if (gh === ga) { ot = r() < sigmoid(0.3 * d) ? 'home' : 'away'; goals.push({ minute: 62, team: ot }); }
-    assignScorers(goals, squad('nhl', league, home), squad('nhl', league, away), r);
-    return { goals, final: { home: gh + (ot === 'home' ? 1 : 0), away: ga + (ot === 'away' ? 1 : 0) }, ot, shotsRate: { home: 30 + 3 * d, away: 30 - 3 * d } };
+    const outOf = (side) => new Set(inj[side].filter((x) => x.playProb === 0).map((x) => x.name));
+    const avail = (team, side) => { const o = outOf(side); const sq = squad('nhl', league, team).filter((p) => !o.has(p.name)); const t = sq.reduce((a, p) => a + p.share, 0) || 1; return sq.map((p) => ({ ...p, share: p.share / t })); };
+    assignScorers(goals, avail(home, 'home'), avail(away, 'away'), r);
+    const shotsRate = { home: 30 + 3 * d, away: 30 - 3 * d };
+    const br = rng(`box:${seed}`);
+    const box = { home: nhlBox(league, home, inj.home, goals.filter((g) => g.team === 'home'), shotsRate.home, br), away: nhlBox(league, away, inj.away, goals.filter((g) => g.team === 'away'), shotsRate.away, br) };
+    return { goals, final: { home: gh + (ot === 'home' ? 1 : 0), away: ga + (ot === 'away' ? 1 : 0) }, ot, shotsRate, box };
   }
   // tennis
   const p = eloExpected(1950 + 140 * trueRating(league, home), 1950 + 140 * trueRating(league, away));
@@ -307,7 +418,8 @@ export function buildMockMatch(leagueId, t, now = Date.now()) {
   const pool = sport === 'tennis' ? PLAYERS[leagueId] : TEAMS[leagueId];
   const i = Math.floor(r() * pool.length); let j = Math.floor(r() * (pool.length - 1)); if (j >= i) j++;
   const home = pool[i]; const away = pool[j];
-  const sim = simulate(sport, leagueId, home, away, seed);
+  const teamInj = sport === 'nba' || sport === 'nhl' ? { home: mockTeamInjuries(sport, leagueId, home, t), away: mockTeamInjuries(sport, leagueId, away, t) } : { home: [], away: [] };
+  const sim = simulate(sport, leagueId, home, away, seed, teamInj);
   const dur = sport === 'tennis' ? tennisDuration(sim) : GRID[leagueId].dur;
   const elapsed = (now - t) / MIN;
   const status = elapsed < 0 ? 'pre' : elapsed < dur ? 'live' : 'post';
@@ -317,6 +429,13 @@ export function buildMockMatch(leagueId, t, now = Date.now()) {
     : { home: teamStats(sport, leagueId, home, t, 'home'), away: teamStats(sport, leagueId, away, t, 'away') };
   if (sport !== 'tennis') {
     stats.home.players = squad(sport, leagueId, home); stats.away.players = squad(sport, leagueId, away);
+    if (sport === 'nba' || sport === 'nhl') {
+      for (const [side, team] of [['home', home], ['away', away]]) {
+        const ro = mockRoster(sport, leagueId, team); const st = stats[side];
+        st.roster = ro; st.teamAvg = rosterAvg(ro, sport); st.rosterSrc = { games: 12, src: 'Mintaadat' }; st.injuries = teamInj[side];
+        if (sport === 'nhl') { const out = new Set(teamInj[side].filter((x) => x.playProb === 0).map((x) => x.name)); st.players = st.players.filter((p) => !out.has(p.name)); st.playersSrc = 'boxscore'; }
+      }
+    }
     if (sport === 'football') {
       const yr = rng(`ycs:${leagueId}:${t}`);
       stats.home.yellowPg = Math.max(0.6, yellowRate(leagueId, home) + gaussSample(yr, 0, 0.15));
@@ -359,6 +478,7 @@ export function buildMockMatch(leagueId, t, now = Date.now()) {
     if (sport === 'football' || sport === 'nhl') m.scorers = { home: sim.goals.filter((g) => g.player && g.team === 'home').map((g) => g.player), away: sim.goals.filter((g) => g.player && g.team === 'away').map((g) => g.player) };
     if (sport === 'football') m.cards = { home: sim.yellows.home, away: sim.yellows.away };
     if (sport === 'nba') m.playerPoints = sim.playerPoints;
+    if (sport === 'nba' || sport === 'nhl') { m.box = sim.box; m.boxState = 'ok'; }
     if (sport === 'handball') m.playerGoals = sim.playerGoals;
     m.statusText = sport === 'nhl' && sim.ot ? 'Vége (h.u.)' : sport === 'nba' && sim.ot ? 'Vége (hossz.)' : 'Vége';
   } else m.statusText = 'Közelgő';

@@ -7,6 +7,7 @@ import { tennisProbs, setFromMatch, matchFromState, matchFromSet } from './model
 import { normCdf, normInv, poissonPmf, clamp, sigmoid, logit } from './mathutil.js';
 import { devig, fairOdds, expectedValue, kelly, round } from './odds.js';
 import { extraMarkets, overWithOT } from './extras.js';
+import { STAT_HU } from './props.js';
 
 const ESTIMATED_MARGIN = 0.06; // used only when no bookmaker or manual odds exist
 const fmtNum = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d).replace('.', ',') : '–');
@@ -281,7 +282,7 @@ function attachOdds(match, markets, manual = {}) {
  * learned, validated calibrator (see engine/ai.js). The raw value is kept in
  * s.pRaw. Double chance is rebuilt from the adjusted 1X2.
  */
-const AI_FAMILIES = new Set(['result', 'totals', 'spread', 'btts', 'teamtotals', 'cards', 'player']);
+const AI_FAMILIES = new Set(['result', 'totals', 'spread', 'btts', 'teamtotals', 'cards', 'player', 'playerdd']);
 function applyAdjust(match, markets, adjust) {
   if (!adjust || match.status !== 'pre') return false;
   let any = false;
@@ -377,6 +378,7 @@ export function betTypeHu(key) {
   if (/^yc/.test(key)) return 'Sárga lapok';
   if (/^gtotal/.test(key)) return 'Összes játék';
   if (/^pl:/.test(key)) return 'Játékos pontjai / góljai';
+  if (/^pp:/.test(key)) { const st = key.split(':')[3]?.replace(/\d+$/, ''); return `Játékos: ${STAT_HU[st]?.short || 'statisztika'}`; }
   return { ah: 'Ázsiai hendikep', scorer: 'Gólszerző', gspread: 'Játékhendikep', bothsets: 'Mindkét játékos nyer szettet' }[key] || null;
 }
 
@@ -426,10 +428,12 @@ export function analyzeMatch(match, { manualOdds = {}, adjust = null } = {}) {
     models: ctx.models,
     expected: ctx.expected,
     notes: ctx.notes,
+    players: ctx.players || null,
     ai: { applied: aiApplied },
     markets: markets.map((mk) => ({
       key: mk.key, label: mk.label, family: mk.family, line: mk.line, overround: mk.overround != null ? round(mk.overround, 4) : null, aiAdjusted: mk.aiAdjusted || undefined,
       exhaustive: !!mk.exhaustive, alt: mk.alt || undefined, betType: betTypeHu(mk.key) || mk.label,
+      player: mk.player || undefined, playerSide: mk.playerSide || undefined, stat: mk.stat || undefined, projection: mk.projection,
       selections: mk.selections.map((s) => ({
         id: s.id, key: s.key, label: s.label, name: s.name, side: s.side, player: s.player,
         p: round(s.p, 4), pRaw: s.pRaw != null ? round(s.pRaw, 4) : undefined, fair: round(s.fair, 2), odds: round(s.odds, 2), oddsSource: s.oddsSource,
